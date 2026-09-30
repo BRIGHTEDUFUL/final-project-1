@@ -235,3 +235,146 @@ def test_stylesheet_contains_core_rules() -> None:
 
 def test_dialog_code_enum_is_usable() -> None:
     assert QDialog.DialogCode.Accepted != QDialog.DialogCode.Rejected
+
+
+# ------------------------------------------------------- alert workflow
+
+
+def test_alert_workflow_from_the_alerts_page(window: MainWindow, context: AppContext) -> None:
+    """Acknowledge / resolve / reopen from the queue, end to end."""
+    from app.models import AlertStatus
+
+    context.monitoring.scan_once()
+    page = window._alerts  # noqa: SLF001
+    page.refresh()
+    assert page._model.rowCount() >= 1  # noqa: SLF001
+
+    # Keep every status visible so the row stays selected between actions.
+    # Note: the model reset after each action clears the view's selection.
+    page._status_filter.setCurrentText("All statuses")  # noqa: SLF001
+
+    page._table.selectRow(0)  # noqa: SLF001
+    page._transition(AlertStatus.ACKNOWLEDGED)  # noqa: SLF001
+    assert context.alerts.list(status=AlertStatus.ACKNOWLEDGED), "acknowledge did not persist"
+
+    page._table.selectRow(0)  # noqa: SLF001
+    page._transition(AlertStatus.RESOLVED)  # noqa: SLF001
+    assert context.alerts.list(status=AlertStatus.RESOLVED), "resolve did not persist"
+
+    page._table.selectRow(0)  # noqa: SLF001
+    page._transition(AlertStatus.ACTIVE)  # noqa: SLF001
+    assert context.alerts.list(status=AlertStatus.ACTIVE), "reopen did not persist"
+
+
+def test_alerts_filter_by_status(window: MainWindow, context: AppContext) -> None:
+    from app.models import AlertStatus
+
+    context.monitoring.scan_once()
+    page = window._alerts  # noqa: SLF001
+    page.refresh()
+    total = page._model.rowCount()  # noqa: SLF001
+    assert total >= 1
+
+    # Resolve everything: the active queue shrinks by one row per action.
+    guard = 0
+    while page._model.rowCount():  # noqa: SLF001
+        page._table.selectRow(0)  # noqa: SLF001
+        page._transition(AlertStatus.RESOLVED)  # noqa: SLF001
+        guard += 1
+        assert guard <= total + 2, "resolve loop did not converge"
+
+    page._status_filter.setCurrentText("Resolved")  # noqa: SLF001
+    assert page._model.rowCount() == total  # noqa: SLF001
+    page._status_filter.setCurrentText("Active")  # noqa: SLF001
+    assert page._model.rowCount() == 0  # noqa: SLF001
+    assert "No alerts match" in page._detail.text()  # noqa: SLF001
+
+
+def test_alerts_csv_export_from_the_page(
+    window: MainWindow, context: AppContext, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PySide6.QtWidgets import QFileDialog
+
+    context.monitoring.scan_once()
+    page = window._alerts  # noqa: SLF001
+    page.refresh()
+    assert page._model.rowCount() >= 1  # noqa: SLF001
+
+    target = tmp_path / "exported.csv"
+    monkeypatch.setattr(
+        QFileDialog,
+        "getSaveFileName",
+        staticmethod(lambda *a, **k: (str(target), "CSV files (*.csv)")),
+    )
+
+    page._export_csv()  # noqa: SLF001
+
+    assert target.is_file()
+    text = target.read_text(encoding="utf-8-sig")
+    assert "alert_type" in text.splitlines()[0]
+
+
+# ------------------------------------------------------- live networks
+
+
+def test_live_networks_filtering_and_double_click(window: MainWindow, context: AppContext) -> None:
+    context.monitoring.scan_once()
+    page = window._live  # noqa: SLF001
+    page.refresh()
+    total = len(page.snapshots)
+    assert total >= 3
+
+    page._search.setText("Corporate")  # noqa: SLF001
+    assert 0 < page._model.rowCount() < total  # noqa: SLF001
+    for row in range(page._model.rowCount()):  # noqa: SLF001
+        snapshot = page._model.row_at(row)
+        assert "corporate" in (snapshot.ssid or "").lower()
+
+    page._search.setText("definitely-not-a-network")  # noqa: SLF001
+    assert page._model.rowCount() == 0  # noqa: SLF001
+    page._search.setText("")  # noqa: SLF001
+    page._filter.setCurrentText("Trusted only")  # noqa: SLF001
+    assert page._model.rowCount() == 0  # noqa: SLF001  # nothing trusted yet
+
+    # Double-clicking a row jumps to investigation.
+    page._filter.setCurrentText("All networks")  # noqa: SLF001
+    page._table.selectRow(0)  # noqa: SLF001
+    page._open_investigation(page._model.index(0, 0))  # noqa: SLF001
+    assert window.current_page_key() == "investigation"
+    assert window._investigation.identity != (None, None)  # noqa: SLF001
+
+
+def test_live_networks_trusted_row_appears_after_baseline(
+    window: MainWindow, context: AppContext
+) -> None:
+    context.trusted.upsert(
+        TrustedNetwork(ssid="Corporate", approved_bssids=("10:20:30:40:50:60",))
+    )
+    context.monitoring.scan_once()
+    page = window._live  # noqa: SLF001
+    page.refresh()
+
+    labels = {s.ssid: s.trust_label for s in page.snapshots}
+    assert labels["Corporate"] in {"Trusted", "Trusted name, new radio"}
+    trusted_rows = [s for s in page.snapshots if s.trusted]
+    assert trusted_rows
+
+
+# ------------------------------------------------------------- dashboard
+
+
+def test_dashboard_reflects_scan_and_alert_counts(window: MainWindow, context: AppContext) -> None:
+    dashboard = window._dashboard  # noqa: SLF001
+    dashboard.refresh()
+    assert dashboard._visible_card.value() == "0"  # noqa: SLF001
+
+    context.monitoring.scan_once()
+    dashboard.refresh()
+
+    assert dashboard._visible_card.value() == "4"  # noqa: SLF001
+    assert int(dashboard._alerts_card.value()) >= 1  # noqa: SLF001
+    assert dashboard._environment_labels["last_scan"].text() not in {
+        "not yet scanned",
+        "failed",
+    }  # noqa: SLF001
+    assert dashboard._alerts_model.rowCount() >= 1  # noqa: SLF001

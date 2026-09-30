@@ -28,3 +28,5 @@ jobs:
         run: pytest
         env:
           ROGUE_AP_HUNTER_HOME: ${{ runner.temp }}\rogue-ap-hunter-home
+          # Run the GUI smoke tests without needing an interactive desktop.
+          QT_QPA_PLATFORM: offscreen
