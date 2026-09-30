@@ -1,8 +1,23 @@
-"""Alert lifecycle: creation, deduplication, acknowledgement and resolution.
-
-Phase 8 will implement the alert manager and notification routing.
-"""
+"""Alert lifecycle: creation, deduplication, acknowledgement, resolution and
+notification on meaningful transitions only."""
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from app.alerts.manager import AlertManager, AlertTransition
+from app.alerts.notifiers import (
+    CompositeNotifier,
+    LogNotifier,
+    Notifier,
+    NullNotifier,
+    WindowsToastNotifier,
+)
+
+__all__ = [
+    "AlertManager",
+    "AlertTransition",
+    "CompositeNotifier",
+    "LogNotifier",
+    "Notifier",
+    "NullNotifier",
+    "WindowsToastNotifier",
+]

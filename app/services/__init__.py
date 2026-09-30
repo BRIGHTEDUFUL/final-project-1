@@ -1,9 +1,11 @@
-"""Long-running services such as the periodic monitoring loop.
+"""Long-running services: the monitoring loop that drives the whole pipeline.
 
-Phase 5 will add the monitoring service with a start/stop lifecycle that never
-overlaps scans and never blocks the GUI thread.
+Services coordinate repositories, detection and alerts. They contain no GUI
+code; the interface layer subscribes to callbacks (or signals) instead.
 """
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from app.services.monitoring import MonitoringService, ScanPipeline, ScanReport
+
+__all__ = ["MonitoringService", "ScanPipeline", "ScanReport"]
