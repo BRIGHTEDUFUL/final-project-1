@@ -10,7 +10,7 @@ import pytest
 from app.alerts import AlertManager, NullNotifier
 from app.core.config import Config
 from app.models import AlertStatus, ScanSessionStatus, Severity, TrustedNetwork
-from app.services import MonitoringService, ScanPipeline
+from app.services import MonitoringService, ScanPipeline, ScanReport
 from app.storage import (
     AlertRepository,
     Database,
@@ -246,6 +246,57 @@ def test_scan_once_reports_errors_without_raising(env) -> None:
     assert not report.ok
     assert service.last_report is report
     assert "failed" in report.summary()
+
+
+def test_scan_once_async_runs_off_the_calling_thread(env) -> None:
+    env["scanner"].delay = 0.1
+    done = threading.Event()
+    reports: list[ScanReport] = []
+
+    def _collect(report: ScanReport) -> None:
+        reports.append(report)
+        done.set()
+
+    service = MonitoringService(env["pipeline"], interval_seconds=3600, on_report=_collect)
+
+    assert service.scan_once_async() is True, "submission must succeed when idle"
+    assert service.last_report is None, "the caller must not block on the scan"
+    assert done.wait(10), "the queued scan must run and report"
+    worker = service._oneshot  # noqa: SLF001
+    if worker is not None:
+        worker.join(5)
+
+    assert len(reports) == 1
+    assert reports[0].ok
+    assert service.scan_once_async() is True, "a finished one-shot frees the slot"
+
+
+def test_scan_once_async_refuses_overlapping_submissions(env) -> None:
+    env["scanner"].delay = 0.2
+    done = threading.Event()
+    service = MonitoringService(
+        env["pipeline"], interval_seconds=3600, on_report=lambda _report: done.set()
+    )
+
+    assert service.scan_once_async() is True
+    assert service.scan_once_async() is False, "a second submission must be refused while busy"
+    assert done.wait(10), "the queued scan must still run"
+    worker = service._oneshot  # noqa: SLF001
+    if worker is not None:
+        worker.join(5)
+
+    done.clear()
+    assert service.scan_once_async() is True, "the slot frees once the worker exits"
+    assert done.wait(10)
+
+
+def test_scan_once_async_refuses_while_the_loop_is_scanning(env) -> None:
+    service = MonitoringService(env["pipeline"], interval_seconds=3600)
+    assert service._scan_lock.acquire(blocking=False)  # noqa: SLF001
+    try:
+        assert service.scan_once_async() is False, "an in-flight loop scan blocks a one-shot"
+    finally:
+        service._scan_lock.release()  # noqa: SLF001
 
 
 def test_alert_transitions_carry_to_the_report(env) -> None:

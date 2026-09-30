@@ -63,7 +63,7 @@ Exit codes: `0` success · `1` runtime failure · `2` invalid arguments ·
 |---------|-----------|
 | **Start monitoring** | Starts the background scan loop. The first scan runs immediately, then repeats every *scan interval* seconds (default **15 s**, configurable 5–3600 s in Settings). The button becomes **Stop monitoring** and the label reads "Monitoring is on". |
 | **Stop monitoring** | Stops the loop and waits up to 10 seconds for the current scan to finish. Consecutive-scan persistence counters live in memory: they survive a stop/start within the same run, and reset when the application exits. |
-| **Scan once** | Runs exactly one scan synchronously and shows the summary in the status bar, formatted as `<n> networks, <n> findings, <n> new alerts in <seconds>s`. The button is disabled while the scan runs. Works whether or not monitoring is on. |
+| **Scan once** | Queues exactly one scan on a background thread — the window stays responsive — and shows the summary in the status bar, formatted as `<n> networks, <n> findings, <n> new alerts in <seconds>s`. The button is disabled until the report arrives; if a scan is already running (the monitoring loop or a previous press) the status bar says so instead of queueing a duplicate. Works whether or not monitoring is on. |
 | State label | "Monitoring is off", "Monitoring is on", or "Monitoring is on · issue: …" when scans are failing. |
 
 A failed scan never interrupts you: it is reported in the status bar

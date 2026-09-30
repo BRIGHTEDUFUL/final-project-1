@@ -150,9 +150,15 @@ MonitoringService._loop()
   (`MonitoringService` docstring). The UI never assumes otherwise: it passes
   `MonitorBridge` methods as callbacks, and Qt's queued connection semantics
   deliver the signals to slots on the GUI thread.
-- **`Scan once` is synchronous** in the GUI: it runs the pipeline on the GUI
-  thread (the button is disabled meanwhile). It is bounded by the scanner's
-  20-second timeout.
+- **`Scan once` is asynchronous**: the button submits
+  `MonitoringService.scan_once_async()`, which spawns a daemon thread
+  (`rogue-ap-oneshot`) and returns immediately. The button is disabled until
+  the report arrives through `MonitorBridge._on_report` (which re-enables it
+  for every report, loop or one-shot). Submissions are refused while a scan
+  is in flight — the service checks both its own one-shot slot and the
+  `_scan_lock` the loop holds while scanning — so the status bar reports
+  "A scan is already in progress" instead of queueing a duplicate pass.
+  Both paths serialise on `_scan_lock`: scans never overlap.
 - **Database access** from both threads is safe by construction: a single
   SQLite connection guarded by an `RLock`, `check_same_thread=False`, WAL
   mode, `busy_timeout = 5000`.

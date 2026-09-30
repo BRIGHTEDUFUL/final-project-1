@@ -369,6 +369,7 @@ class MonitoringService:
         self._lifecycle_lock = threading.Lock()
         self._scan_lock = threading.Lock()
         self._thread: threading.Thread | None = None
+        self._oneshot: threading.Thread | None = None
         self._last_report: ScanReport | None = None
 
     # -------------------------------------------------------------- state
@@ -457,7 +458,41 @@ class MonitoringService:
         self._emit(report)
         return report
 
+    def scan_once_async(self) -> bool:
+        """Queue one scan on a background thread; ``False`` when busy.
+
+        Never blocks the caller: the GUI hands the work over and re-enables
+        its controls when the report arrives through the callbacks. A scan
+        already in flight (the monitoring loop or a previous one-shot) makes
+        this return ``False`` instead of queueing a duplicate pass.
+        """
+        with self._lifecycle_lock:
+            worker = self._oneshot
+            if worker is not None and worker.is_alive():
+                return False
+            if self._scan_lock.locked():
+                return False
+            worker = threading.Thread(
+                target=self._oneshot_run,
+                name="rogue-ap-oneshot",
+                daemon=True,
+            )
+            self._oneshot = worker
+        worker.start()
+        logger.debug("one-shot scan queued")
+        return True
+
     # -------------------------------------------------------------- internals
+
+    def _oneshot_run(self) -> None:
+        """Worker body for :meth:`scan_once_async`; never raises."""
+        try:
+            # Serialised with the monitoring loop's pass, so scans never
+            # overlap. The lock is always released, even on failure.
+            with self._scan_lock:
+                self.scan_once()
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("one-shot scan failed unexpectedly")
 
     def _loop(self) -> None:
         # Scan immediately on start so the dashboard is not empty for a cycle.

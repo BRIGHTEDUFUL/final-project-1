@@ -36,7 +36,7 @@ tests/
 ├── support.py           FakeScanner, FakeFrameSource and byte-level frame builders (not collected by pytest)
 ├── fixtures/            7 sanitized netsh output samples
 ├── unit/                19 files · 309 tests · ~2 s
-└── integration/          6 files · 78 tests (1 environment-skipped) · ~15 s
+└── integration/          6 files · 82 tests (1 environment-skipped) · ~15 s
 ```
 
 ### Fixtures (`tests/fixtures/`)
@@ -96,12 +96,12 @@ Storage tests use `:memory:` or `tmp_path` databases.
 | `test_export.py` | 12 | CSV export: column sets, UTF-8-BOM output, quoting/escaping, atomic write + replace, `ExportError` on write failure |
 | `test_model_independence.py` | 2 | Models import no GUI/scanner/storage modules — only stdlib + `app.models` |
 
-### 3.2 Integration tests — `tests/integration/` (78 tests, 1 environment-skipped)
+### 3.2 Integration tests — `tests/integration/` (82 tests, 1 environment-skipped)
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `test_gui_smoke.py` | 29 | Real `MainWindow` on **Qt's offscreen platform** with a temporary `AppContext` and `FakeScanner`: window construction, navigation to every page (parametrised over `NAV_ITEMS`), unknown-page handling, scan-once updating status/pages, monitoring toggle, surfacing failed scans, investigation evidence, dashboard counts, live-network filtering and double-click investigation, alert acknowledge/resolve/reopen from the queue, alert status filters, CSV export from the alerts page, settings round-trip (including the frame-observer toggle) + invalid-threshold rejection, trusted-network dialog validation and CRUD, theme stylesheet |
-| `test_monitoring.py` | 16 | End-to-end pipeline `scan → parse → detect → score → persist → alert`: first-scan behaviour, second-scan dedup, security downgrade alerting, combined scoring, unavailable/failed/empty scans, retention pruning, service start/stop/idempotency, callback failure resilience, error reports, alert transitions in reports, **beacon evidence appended without changing scores** |
+| `test_gui_smoke.py` | 30 | Real `MainWindow` on **Qt's offscreen platform** with a temporary `AppContext` and `FakeScanner`: window construction, navigation to every page (parametrised over `NAV_ITEMS`), unknown-page handling, async scan-once updating status/pages (event-loop wait) + busy-message refusal, monitoring toggle, surfacing failed scans, investigation evidence, dashboard counts, live-network filtering and double-click investigation, alert acknowledge/resolve/reopen from the queue, alert status filters, CSV export from the alerts page, settings round-trip (including the frame-observer toggle) + invalid-threshold rejection, trusted-network dialog validation and CRUD, theme stylesheet |
+| `test_monitoring.py` | 19 | End-to-end pipeline `scan → parse → detect → score → persist → alert`: first-scan behaviour, second-scan dedup, security downgrade alerting, combined scoring, unavailable/failed/empty scans, retention pruning, service start/stop/idempotency, callback failure resilience, error reports, alert transitions in reports, **beacon evidence appended without changing scores**, async one-shot scans (off-thread, overlap refusal while busy or mid-loop) |
 | `test_reliability.py` | 11 | Failures degrade instead of crashing: closed or unusable storage becomes an error report (and the next scan recovers), a raising scanner, failed commands, malformed and binary-junk output, history reload after a restart, rapid start/stop cycles, stop-without-start, raising callbacks |
 | `test_config_application.py` | 11 | Saved settings reaching the running services: `apply_config` re-points the pipeline and scorer, keeps alert-manager cooldown state, changes scores on the next scan, moves the retention window, updates the monitoring interval (idle and running, callbacks preserved), **toggles the frame observer live** and keeps scanning when the driver is absent |
 | `test_startup.py` | 8 | CLI entry: `--headless` exit `0`, `--version`, `--write-default-config`, explicit `--config`, corrupt config tolerance, GUI-unavailable exit code `3`, idempotent logging, invalid log level rejection |

@@ -9,6 +9,8 @@ and the settings/trusted-network dialogs.
 from __future__ import annotations
 
 import os
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -73,6 +75,18 @@ def window(qapp: QApplication, context: AppContext) -> MainWindow:
     qapp.processEvents()
 
 
+def _wait_for(condition: Callable[[], bool], timeout: float = 10.0) -> bool:
+    """Pump the Qt event loop until ``condition`` holds or time runs out."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        QApplication.processEvents()
+        if condition():
+            return True
+        time.sleep(0.01)
+    QApplication.processEvents()
+    return bool(condition())
+
+
 # ------------------------------------------------------------------ window
 
 
@@ -102,6 +116,9 @@ def test_unknown_page_is_ignored(window: MainWindow, caplog: pytest.LogCaptureFi
 
 def test_scan_once_updates_status_and_pages(window: MainWindow, context: AppContext) -> None:
     window.scan_once()
+    # The one-shot runs on a worker thread; pump events until it reports
+    # (the report handler re-enables the button).
+    assert _wait_for(lambda: window._scan_once_button.isEnabled())  # noqa: SLF001
     assert context.monitoring.last_report is not None
     assert context.observations.count() == 4
     assert window.statusBar().currentMessage() != ""
@@ -113,6 +130,19 @@ def test_scan_once_updates_status_and_pages(window: MainWindow, context: AppCont
 
     window.show_page("history")
     assert window._history._session_model.rowCount() >= 1  # noqa: SLF001
+
+
+def test_scan_once_shows_busy_message_when_a_scan_is_running(
+    window: MainWindow, context: AppContext
+) -> None:
+    monitoring = context.monitoring
+    assert monitoring._scan_lock.acquire(blocking=False)  # noqa: SLF001
+    try:
+        window.scan_once()
+        assert "already in progress" in window.statusBar().currentMessage()
+        assert window._scan_once_button.isEnabled()  # noqa: SLF001
+    finally:
+        monitoring._scan_lock.release()  # noqa: SLF001
 
 
 def test_monitoring_toggle_starts_and_stops(window: MainWindow, context: AppContext) -> None:

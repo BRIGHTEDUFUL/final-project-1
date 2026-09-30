@@ -266,16 +266,12 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def scan_once(self) -> None:
-        """Run a single scan immediately (blocking, but short)."""
+        """Queue a single scan on a background thread (the UI stays live)."""
+        if not self._context.monitoring.scan_once_async():
+            self.statusBar().showMessage("A scan is already in progress", 5000)
+            return
         self._scan_once_button.setEnabled(False)
-        try:
-            report = self._context.monitoring.scan_once()
-        finally:
-            self._scan_once_button.setEnabled(True)
-        if report.ok:
-            self.statusBar().showMessage(report.summary(), 8000)
-        else:
-            self.statusBar().showMessage(f"Scan failed: {report.error}", 10000)
+        self.statusBar().showMessage("Scanning\u2026", 5000)
 
     def _set_monitor_state(self, running: bool, detail: str = "") -> None:
         self._monitor_button.setText("Stop monitoring" if running else "Start monitoring")
@@ -290,6 +286,9 @@ class MainWindow(QMainWindow):
     @Slot(object)
     def _on_report(self, report: object) -> None:
         """Handle a completed scan on the GUI thread."""
+        # Every scan (loop or one-shot) reports here: re-enabling is safe
+        # even if the button was not disabled by this report.
+        self._scan_once_button.setEnabled(True)
         counts = self._context.alert_manager.counts()
         self._update_alert_indicator(counts)
 
@@ -311,6 +310,7 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _on_error(self, message: str) -> None:
         """Show a scan failure without interrupting the user."""
+        self._scan_once_button.setEnabled(True)
         self.statusBar().showMessage(f"Scan failed: {message}", 10000)
         self._monitor_state.setText(f"Monitoring is on \u00b7 issue: {message[:80]}")
 

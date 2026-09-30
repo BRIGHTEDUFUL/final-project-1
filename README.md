@@ -124,7 +124,7 @@ pytest tests/unit         # fast unit tests only
 .\scripts\dev-check.ps1   # lint + tests in one step (the pre-commit gate)
 ```
 
-- The suite currently reports **386 tests passing, 1 environment-skipped**
+- The suite currently reports **390 tests passing, 1 environment-skipped**
   (the live frame-capture check skips when Npcap is absent; measured with
   `.\.venv\Scripts\pytest.exe`); see
   [`docs/testing-report.md`](docs/testing-report.md) for the breakdown.

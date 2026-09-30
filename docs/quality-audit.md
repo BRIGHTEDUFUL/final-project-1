@@ -51,7 +51,7 @@ tests listed in `docs/testing-report.md`.
 
 | Item | Rationale |
 | --- | --- |
-| *Scan once* runs on the GUI thread | measured pipeline cost is single-digit ms plus one `netsh` call (`docs/performance.md`); blocking this long on an explicit button press is acceptable. Backlog: worker thread with a busy cursor. |
+| *Scan once* runs on the GUI thread | ✅ fixed — *Scan once* now submits `scan_once_async()` to a daemon thread; the button is disabled until the report arrives through the bridge, and overlapping submissions are refused (`test_scan_once_async_*`, `test_scan_once_shows_busy_message_*`). |
 | Notification cooldown lives in memory | resets on restart by design (never persist "do not disturb" state); worst case is one repeated toast after a restart. |
 | No code signing / no icon / no version resource | free-only constraint: no certificates or proprietary tooling. Documented with a SmartScreen workaround in `docs/packaging.md`. |
 | English `netsh` label dependence | parser is tolerant and fixture-tested; non-English Windows is a documented limitation, not a silent failure (unknown labels degrade, they do not corrupt — see malformed fixtures). |
