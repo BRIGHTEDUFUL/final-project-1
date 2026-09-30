@@ -8,6 +8,7 @@ from __future__ import annotations
 from app.parser.interfaces import InterfaceInfo, parse_interfaces
 from app.parser.netsh_networks import (
     ParsedNetwork,
+    locale_diagnostic,
     parse_visible_networks,
     parse_visible_networks_as_observations,
 )
@@ -15,6 +16,7 @@ from app.parser.netsh_networks import (
 __all__ = [
     "InterfaceInfo",
     "ParsedNetwork",
+    "locale_diagnostic",
     "parse_interfaces",
     "parse_visible_networks",
     "parse_visible_networks_as_observations",

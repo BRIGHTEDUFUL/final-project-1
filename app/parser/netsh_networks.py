@@ -7,8 +7,11 @@ position) drives the parse rather than a fixed line layout.
 
 Locale note: Windows localises some labels. Values that are recognised by
 shape (MAC addresses, percentages, integers) are extracted regardless of the
-label language; English key aliases cover the semantic fields. Unknown
-labels are preserved in nothing and skipped — never guessed.
+label language; English key aliases cover the semantic fields, and inside a
+radio block a percent value or bare channel integer is recovered even when
+its label translated. Unknown labels are never guessed — when the
+frequently translated labels all go unrecognised, :func:`locale_diagnostic`
+says so honestly instead of letting partial results pass silently.
 """
 
 from __future__ import annotations
@@ -22,7 +25,12 @@ from app.models import NetworkObservation, utcnow
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["ParsedNetwork", "parse_visible_networks", "parse_visible_networks_as_observations"]
+__all__ = [
+    "ParsedNetwork",
+    "locale_diagnostic",
+    "parse_visible_networks",
+    "parse_visible_networks_as_observations",
+]
 
 _KEY_VALUE_PATTERN = re.compile(r"^(?P<indent>\s*)(?P<key>[^:]+?)\s*:\s*(?P<value>.*)$")
 _BSSID_KEY_PATTERN = re.compile(r"^bssid\b", re.IGNORECASE)
@@ -158,6 +166,21 @@ def parse_visible_networks(text: str) -> list[ParsedNetwork]:
                 if parsed_channel is not None:
                     current_radio["channel"] = parsed_channel
             continue
+        # Locale-tolerant recovery: labels translate, value shapes do not.
+        # Inside a radio block a percent value is a signal reading and a bare
+        # integer is a channel on every locale netsh ships in. Set-once, so
+        # an English label that matched first is never overwritten.
+        if current_radio is not None:
+            if current_radio.get("signal") is None:
+                parsed_signal = _to_signal(value)
+                if parsed_signal is not None:
+                    current_radio["signal"] = parsed_signal
+                    continue
+            if current_radio.get("channel") is None:
+                parsed_channel = _to_channel(value)
+                if parsed_channel is not None:
+                    current_radio["channel"] = parsed_channel
+                    continue
         # Any other label whose value looks like a MAC address is a BSSID.
         if current_radio is None and re.fullmatch(r"[0-9a-fA-F]{2}([:-][0-9a-fA-F]{2}){5}", value):
             close_radio()
@@ -166,6 +189,55 @@ def parse_visible_networks(text: str) -> list[ParsedNetwork]:
 
     close_radio()
     return networks
+
+
+def locale_diagnostic(text: str) -> str | None:
+    """Return an honest warning when netsh output uses labels we cannot read.
+
+    Detection is deliberately conservative so it never fires on English
+    output: at least one SSID block must be present, none of the three
+    frequently translated labels (authentication, encryption, channel) may
+    match their English aliases, and several labelled lines inside the
+    blocks must have gone unrecognised. Values recovered by shape (BSSID
+    MAC addresses, percent signals) do not count as lost labels.
+    """
+    if not text or not text.strip():
+        return None
+
+    seen_ssid = False
+    translated_matches = 0
+    unrecognised = 0
+    for raw_line in text.splitlines():
+        match = _KEY_VALUE_PATTERN.match(raw_line.rstrip())
+        if not match:
+            continue
+        key = match.group("key").strip()
+        value = match.group("value").strip()
+        if _SSID_KEY_PATTERN.match(key):
+            seen_ssid = True
+            continue
+        if not seen_ssid:
+            continue
+        if (
+            _AUTH_KEY_PATTERN.match(key)
+            or _ENCRYPTION_KEY_PATTERN.match(key)
+            or _CHANNEL_KEY_PATTERN.match(key)
+        ):
+            translated_matches += 1
+            continue
+        if _BSSID_KEY_PATTERN.match(key) or _SIGNAL_KEY_PATTERN.match(key):
+            continue
+        if re.fullmatch(r"[0-9a-fA-F]{2}([:-][0-9a-fA-F]{2}){5}", value):
+            continue  # BSSID label recovered by shape — not a lost label
+        unrecognised += 1
+
+    if seen_ssid and translated_matches == 0 and unrecognised >= 2:
+        return (
+            "netsh returned network details with unrecognised labels "
+            "(non-English Windows output); security details may be incomplete "
+            "— see docs/troubleshooting.md"
+        )
+    return None
 
 
 def parse_visible_networks_as_observations(

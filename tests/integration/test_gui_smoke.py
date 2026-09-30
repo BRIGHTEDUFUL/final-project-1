@@ -149,6 +149,16 @@ def test_scan_once_shows_busy_message_when_a_scan_is_running(
         monitoring._scan_lock.release()  # noqa: SLF001
 
 
+def test_scan_locale_warning_reaches_the_status_bar(
+    window: MainWindow, context: AppContext, load_fixture
+) -> None:
+    context.scanner.network_text = load_fixture("netsh_show_networks_localized_es.txt")  # type: ignore[attr-defined]
+    window.scan_once()
+    assert _wait_for(lambda: window._scan_once_button.isEnabled())  # noqa: SLF001
+    message = window.statusBar().currentMessage()
+    assert "non-English" in message, "partial locale parses must be surfaced, not silent"
+
+
 def test_monitoring_toggle_starts_and_stops(window: MainWindow, context: AppContext) -> None:
     window.toggle_monitoring()
     assert context.monitoring.is_running

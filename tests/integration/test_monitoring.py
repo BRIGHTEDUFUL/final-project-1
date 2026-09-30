@@ -299,6 +299,26 @@ def test_scan_once_async_refuses_while_the_loop_is_scanning(env) -> None:
         service._scan_lock.release()  # noqa: SLF001
 
 
+def test_localized_scan_carries_a_locale_warning(env, load_fixture) -> None:
+    env["scanner"].network_text = load_fixture("netsh_show_networks_localized_es.txt")
+    service = MonitoringService(env["pipeline"], interval_seconds=1)
+    report = service.scan_once()
+    assert report.ok
+    assert len(report.warnings) == 1
+    assert "non-English" in report.warnings[0]
+    # Shape recovery still fed the pipeline usable signal/channel data.
+    assert len(report.observations) == 2
+    assert {o.channel for o in report.observations} == {44, 149}
+    assert {o.signal_strength for o in report.observations} == {87, 54}
+
+
+def test_english_scan_reports_no_warnings(env) -> None:
+    service = MonitoringService(env["pipeline"], interval_seconds=1)
+    report = service.scan_once()
+    assert report.ok
+    assert report.warnings == ()
+
+
 def test_alert_transitions_carry_to_the_report(env) -> None:
     env["trusted"].upsert(TrustedNetwork(ssid="Guest", approved_bssids=("11:22:33:44:55:66",)))
     report = env["pipeline"].run()

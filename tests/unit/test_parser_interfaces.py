@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.parser import parse_interfaces
+from app.parser import InterfaceInfo, parse_interfaces
 
 
 def test_parses_connected_interface(load_fixture) -> None:
@@ -59,3 +59,37 @@ def test_malformed_values_do_not_raise() -> None:
     assert info.rssi is None
     assert info.mac_address is None
     assert info.raw  # raw capture still available for diagnostics
+
+
+# --------------------------------------------------------------------- locale
+
+
+def test_localized_output_starts_block_on_guid_and_recovers_by_shape(load_fixture) -> None:
+    """Spanish labels: the block starts on the GUID and MAC/%/int recover."""
+    (info,) = parse_interfaces(load_fixture("netsh_show_interfaces_localized_es.txt"))
+    assert info.name is None  # the "Name" label did not translate to English
+    assert info.mac_address == "00:11:22:33:44:55"
+    assert info.ssid == "Oficina-5G"
+    assert info.bssid == "38:af:29:aa:bb:01"
+    assert info.channel == 44
+    assert info.signal == 87
+    assert info.state is None  # the "State" label did not translate
+    assert info.is_connected  # a reported BSSID is locale-proof evidence
+
+
+def test_second_unlabelled_mac_is_taken_as_bssid() -> None:
+    text = (
+        "    GUID     : {8a9d6f12-3c4e-4b5a-9c7d-1e2f3a4b5c6d}\n"
+        "    Some address : 00:11:22:33:44:55\n"
+        "    Other address : aa:bb:cc:dd:ee:ff\n"
+    )
+    (info,) = parse_interfaces(text)
+    assert info.mac_address == "00:11:22:33:44:55"
+    assert info.bssid == "aa:bb:cc:dd:ee:ff"
+    assert info.is_connected
+
+
+def test_bssid_presence_marks_connected_and_its_absence_does_not() -> None:
+    assert InterfaceInfo(state="conectado", bssid="aa:bb:cc:dd:ee:ff").is_connected
+    assert not InterfaceInfo(state="disconnected").is_connected
+    assert not InterfaceInfo(state="desconectado").is_connected

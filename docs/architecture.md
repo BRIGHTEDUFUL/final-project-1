@@ -16,7 +16,7 @@ repository (`app/`), not a target design.
 | Configuration | `app/core/config.py` | Frozen `Config` + `RiskWeights` dataclasses, validation, atomic JSON save/load. |
 | Logging | `app/core/logging_setup.py` | Idempotent bootstrap: console handler + rotating file handler (1 MB, 3 backups). |
 | Scanner | `app/scanner/netsh.py`, `raw.py`, `errors.py` | Read-only adapter for `netsh wlan show networks mode=bssid` and `netsh wlan show interfaces`; fixed argument lists, timeouts, typed errors. Returns `RawScanResult` (text only). |
-| Parser | `app/parser/netsh_networks.py`, `interfaces.py` | Defensive text parsing into `NetworkObservation` and `InterfaceInfo`. |
+| Parser | `app/parser/netsh_networks.py`, `interfaces.py` | Defensive text parsing into `NetworkObservation` and `InterfaceInfo`; locale-tolerant (value-shape recovery for signal/channel/BSSID/connected-state, plus a conservative `locale_diagnostic()` that warns honestly on non-English `netsh` labels). |
 | Domain models | `app/models/` | Validated, mostly frozen dataclasses: `NetworkObservation`, `TrustedNetwork`, `Alert`, `Severity`, `ScanSession`, `ApplicationSetting`, BSSID/security helpers. Import nothing outside the stdlib. |
 | Detection | `app/detection/` | `DetectionContext` (input snapshot), five pure rules in `rules.py`, `DetectionEngine` (persistence tracking, `DetectionReport`). |
 | Scoring | `app/scoring/risk.py` | `RiskScorer` → `RiskAssessment` (score, severity, reasons, per-rule breakdown). |
@@ -71,14 +71,14 @@ repository (`app/`), not a target design.
                                                       │
                                                       ▼
                                       ScanReport {session, observations, findings,
-                                                  assessments, alerts, duration, error}
+                                                  assessments, alerts, duration, error, warnings}
                                                       │ callbacks (worker thread)
                                                       ▼
                                       MonitorBridge.emit_report() → Qt Signal
                                                       │ queued connection
                                                       ▼
                                       MainWindow._on_report() on the GUI thread
-                                        → status bar, alert indicator, page refresh
+                                        → status bar (summary + locale warning), alert indicator, page refresh
 ```
 
 ### 2.2 Mermaid version

@@ -1,0 +1,13 @@
+Nombre de interfaz       : Wi-Fi
+Descripción              : Intel(R) Wi-Fi 6E AX211 160MHz
+GUID                     : {8a9d6f12-3c4e-4b5a-9c7d-1e2f3a4b5c6d}
+Dirección física         : 00:11:22:33:44:55
+Estado                   : conectado
+SSID                     : Oficina-5G
+Tipo de red              : Infraestructura
+Tipo de radio            : 802.11ac
+Autenticación            : WPA2-Personal
+Cifrado                  : CCMP
+Canal                    : 44
+BSSID                    : 38:af:29:aa:bb:01
+Señal                    : 87 %

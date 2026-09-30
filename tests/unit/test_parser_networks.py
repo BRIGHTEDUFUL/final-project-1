@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from app.parser import parse_visible_networks, parse_visible_networks_as_observations
+from app.parser import (
+    locale_diagnostic,
+    parse_visible_networks,
+    parse_visible_networks_as_observations,
+)
 
 
 def test_parses_real_single_network_output(load_fixture) -> None:
@@ -113,3 +117,48 @@ def test_intermediate_records_expose_security_label() -> None:
     text = "SSID 1 : X\n    Authentication : Open\n    Encryption : WEP\n"
     (record,) = parse_visible_networks(text)
     assert record.security_label() == "WEP"
+
+
+# --------------------------------------------------------------------- locale
+
+
+def test_localized_labels_recover_signal_and_channel_by_shape(load_fixture) -> None:
+    """Spanish labels: percent/integer shapes still yield signal and channel."""
+    observations = parse_visible_networks_as_observations(
+        load_fixture("netsh_show_networks_localized_es.txt")
+    )
+    assert len(observations) == 2
+    first, second = observations
+    assert first.ssid == "Oficina-5G"
+    assert first.bssid == "38:af:29:aa:bb:01"
+    assert first.signal_strength == 87
+    assert first.channel == 44
+    assert second.bssid == "38:af:29:aa:bb:02"
+    assert second.signal_strength == 54
+    assert second.channel == 149
+    # Security labels have no value shape — absence stays honest, not guessed.
+    assert first.security is None
+    assert second.security is None
+
+
+def test_locale_diagnostic_flags_localized_output(load_fixture) -> None:
+    note = locale_diagnostic(load_fixture("netsh_show_networks_localized_es.txt"))
+    assert note is not None
+    assert "non-English" in note
+    assert "troubleshooting" in note
+
+
+def test_locale_diagnostic_stays_silent_on_english(load_fixture) -> None:
+    for name in (
+        "netsh_show_networks_multi.txt",
+        "netsh_show_networks_single.txt",
+        "netsh_show_networks_malformed.txt",
+        "netsh_show_networks_empty.txt",
+    ):
+        assert locale_diagnostic(load_fixture(name)) is None, name
+
+
+def test_locale_diagnostic_ignores_empty_and_banner_only_text() -> None:
+    assert locale_diagnostic("") is None
+    assert locale_diagnostic("   \n") is None
+    assert locale_diagnostic("There are 0 networks currently visible.\n") is None

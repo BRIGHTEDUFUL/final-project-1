@@ -298,7 +298,11 @@ class MainWindow(QMainWindow):
 
         if report.ok:  # type: ignore[attr-defined]
             summary = report.summary()  # type: ignore[attr-defined]
-            self.statusBar().showMessage(summary, 8000)
+            warnings = getattr(report, "warnings", ()) or ()
+            if warnings:
+                self.statusBar().showMessage(f"{summary} · {warnings[0]}", 15000)
+            else:
+                self.statusBar().showMessage(summary, 8000)
         else:
             self.statusBar().showMessage(f"Scan failed: {report.error}", 10000)  # type: ignore[attr-defined]
 

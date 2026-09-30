@@ -1,0 +1,16 @@
+Hay 1 redes actualmente visibles.
+
+Interfaz: Wi-Fi
+---------------
+SSID 1                : Oficina-5G
+    Tipo de red            : Infraestructura
+    Autenticación          : WPA2-Personal
+    Cifrado                : CCMP
+    BSSID 1                : 38:af:29:aa:bb:01
+        Señal                  : 87 %
+        Tipo de radio          : 802.11n
+        Canal                  : 44
+    BSSID 2                : 38:af:29:aa:bb:02
+        Señal                  : 54 %
+        Tipo de radio          : 802.11ac
+        Canal                  : 149

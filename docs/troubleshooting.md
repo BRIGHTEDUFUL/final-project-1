@@ -61,6 +61,38 @@ Monitoring keeps retrying every scan interval, so once the adapter is back the
 next pass recovers automatically. The **Dashboard → Current environment**
 panel shows the interface state after a successful scan.
 
+### Non-English Windows output
+
+`netsh` localises its labels (`Autenticación` instead of `Authentication`,
+`Kanal` instead of `Channel`, `Estado` instead of `State`, …). The parsers
+recover what translates safely, by **value shape**:
+
+| Recovered by shape | Why it is safe |
+|--------------------|----------------|
+| BSSID / MAC addresses | `aa:bb:cc:dd:ee:ff` looks the same in every language |
+| Signal percentage | a bare `87 %` inside a radio block is always the signal |
+| Channel number | a bare integer inside a radio block is always the channel |
+| Connected interface | netsh reports a BSSID only while connected, whatever the state label says |
+
+What cannot be recovered by shape is the **security label**. When none of
+the frequently translated labels (`Authentication`, `Encryption`,
+`Channel`) match their English aliases, the scan still succeeds but the
+status bar appends an honest warning:
+
+```text
+4 networks, 0 findings, 0 new alerts in 0.42s · netsh returned network
+details with unrecognised labels (non-English Windows output); security
+details may be incomplete — see docs/troubleshooting.md
+```
+
+The same line is written to the log at `WARNING` level. Security fields
+then display as `—` instead of being guessed, and rules that compare
+security labels (for example the security-downgrade rule) cannot fire until
+labels parse; SSID/BSSID based detection, history and alerts are unchanged.
+The warning never fires on English output — the detection is conservative
+by design (fixture-tested both ways: `netsh_show_networks_localized_es.txt`
+warns, every English fixture stays silent).
+
 ---
 
 ## 2. The application will not start (general)

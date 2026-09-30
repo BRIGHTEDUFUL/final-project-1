@@ -20,7 +20,12 @@ from app.capture import FrameObserver
 from app.core.config import Config
 from app.detection import DetectionContext, DetectionEngine, Finding
 from app.models import Alert, AlertType, NetworkObservation, ScanSession, ScanSessionStatus, utcnow
-from app.parser import InterfaceInfo, parse_interfaces, parse_visible_networks_as_observations
+from app.parser import (
+    InterfaceInfo,
+    locale_diagnostic,
+    parse_interfaces,
+    parse_visible_networks_as_observations,
+)
 from app.scanner import NetshScanner, ScannerError
 from app.scoring import RiskAssessment, RiskScorer
 from app.storage import (
@@ -50,6 +55,7 @@ class ScanReport:
     duration_seconds: float = 0.0
     error: str | None = None
     scanner_detail: str = ""
+    warnings: tuple[str, ...] = ()
 
     @property
     def ok(self) -> bool:
@@ -234,6 +240,14 @@ class ScanPipeline:
         observations = parse_visible_networks_as_observations(result.stdout, observed_at=utcnow())
         connected_bssid, connected_signal = self._connection_state()
 
+        # Locale honesty: partial parses on non-English Windows are surfaced,
+        # never left to look like a quiet, complete result.
+        warnings: list[str] = []
+        locale_note = locale_diagnostic(result.stdout)
+        if locale_note:
+            warnings.append(locale_note)
+            logger.warning("%s", locale_note)
+
         known = self.known_bssids
         context = DetectionContext(
             observations=tuple(observations),
@@ -290,6 +304,7 @@ class ScanPipeline:
             alerts=tuple(transitions),
             duration_seconds=perf_counter() - started,
             scanner_detail=detail,
+            warnings=tuple(warnings),
         )
 
     def _connection_state(self) -> tuple[str | None, int | None]:

@@ -3,6 +3,11 @@
 Used for availability checks, connection context and the dashboard "current
 environment" panel. Defensive like the network parser: unknown labels are
 ignored, missing values stay ``None``.
+
+Locale note: labels translate with Windows, value shapes do not. A block is
+started on the GUID value even when the "Name" label is localised, connection
+state falls back to "a BSSID is reported" (netsh lists one only while
+connected), and MAC/percent/integer values are recovered by shape.
 """
 
 from __future__ import annotations
@@ -15,6 +20,9 @@ __all__ = ["InterfaceInfo", "parse_interfaces"]
 _KEY_VALUE_PATTERN = re.compile(r"^\s*(?P<key>[^:]+?)\s*:\s*(?P<value>.*)$")
 _NAME_KEY_PATTERN = re.compile(r"^name$", re.IGNORECASE)
 _MAC_PATTERN = re.compile(r"^[0-9a-fA-F]{2}([:-][0-9a-fA-F]{2}){5}$")
+_GUID_PATTERN = re.compile(
+    r"^\{[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\}$"
+)
 _SIGNAL_PATTERN = re.compile(r"^(\d{1,3})\s*%$")
 
 
@@ -36,7 +44,14 @@ class InterfaceInfo:
 
     @property
     def is_connected(self) -> bool:
-        """``True`` when the interface reports an active connection."""
+        """``True`` when the interface reports an active connection.
+
+        The ``State`` label translates with Windows; a reported BSSID does
+        not — netsh lists one only while the interface is connected — so it
+        doubles as locale-proof evidence.
+        """
+        if self.bssid:
+            return True
         return bool(self.state) and self.state.strip().lower() == "connected"
 
     @property
@@ -92,6 +107,12 @@ def parse_interfaces(text: str) -> list[InterfaceInfo]:
             continue
 
         if current is None:
+            # Localised Windows relabels "Name"; start the block on the GUID
+            # value instead, whose shape never translates.
+            if _GUID_PATTERN.match(value):
+                current = InterfaceInfo()
+                interfaces.append(current)
+                current.raw[key] = value
             continue
 
         lower = key.lower()
@@ -117,5 +138,24 @@ def parse_interfaces(text: str) -> list[InterfaceInfo]:
             current.signal = _to_signal(value)
         elif lower in {"rssi", "radio signal"}:
             current.rssi = _to_int(value)
+        else:
+            # Locale-tolerant value shapes: labels translate, MAC addresses,
+            # percentages and bare channel integers do not. The first MAC in
+            # a block is the physical address; a second one is the BSSID
+            # (netsh lists it only while connected).
+            if _MAC_PATTERN.match(value):
+                if current.mac_address is None:
+                    current.mac_address = value.lower()
+                elif current.bssid is None:
+                    current.bssid = value.lower()
+            else:
+                if current.signal is None:
+                    percent = _to_signal(value)
+                    if percent is not None:
+                        current.signal = percent
+                if current.channel is None:
+                    integer = _to_int(value)
+                    if integer is not None and 1 <= integer <= 255:
+                        current.channel = integer
 
     return interfaces
