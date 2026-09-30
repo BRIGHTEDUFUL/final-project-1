@@ -1,17 +1,74 @@
-"""Visual theme: one dark, professional stylesheet shared by every screen."""
+"""Visual theme: the instrument-panel design system shared by every screen.
+
+Design concept
+--------------
+The interface is modelled on lab test equipment (a spectrum analyser front
+panel): a graphite housing, panels divided by etched hairlines, a single live
+indicator lamp, readouts in large tabular numerals and radio identifiers set
+in monospace.
+
+Rules the rest of the UI follows:
+
+* **Colour means state.** Signal cyan marks interaction (active navigation,
+  focus, selection, the primary action, the live lamp); the severity palette
+  is reserved for risk. Everything else is graphite and hairlines.
+* **Structure comes from hairlines**, never shadows or gradients.
+* **Prose is Segoe UI, identifiers are monospace** (BSSIDs, baselines).
+* **Sentence case throughout** — no all-caps labels.
+
+Implementation note
+-------------------
+The stylesheet deliberately avoids a global ``QWidget { background }`` rule:
+that rule paints phantom boxes behind every child label (a QLabel inherits
+QFrame, so frame rules also bleed into labels). Backgrounds are always scoped
+to an object name (``#panel``, ``#statStrip``…) or to a container class
+(``QMainWindow``, ``QDialog``).
+"""
 
 from __future__ import annotations
 
-from PySide6.QtGui import QColor, QFont, QPalette
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
 from PySide6.QtWidgets import QApplication
 
-__all__ = ["ACCENT", "CRITICAL_COLOR", "HIGH_COLOR", "LOW_COLOR", "SUSPICIOUS_COLOR", "apply_theme", "stylesheet"]
+__all__ = [
+    "ACCENT",
+    "CRITICAL_COLOR",
+    "HIGH_COLOR",
+    "LINE",
+    "LOW_COLOR",
+    "PANEL",
+    "RAISED",
+    "SEVERITY_COLORS",
+    "SIGNAL",
+    "SUSPICIOUS_COLOR",
+    "TEXT_HI",
+    "TEXT_LOW",
+    "TEXT_MID",
+    "apply_theme",
+    "mono_font",
+    "stylesheet",
+]
 
-ACCENT = "#4f8cff"
-LOW_COLOR = "#3fae6b"
-SUSPICIOUS_COLOR = "#e0a63a"
-HIGH_COLOR = "#e07a3f"
-CRITICAL_COLOR = "#e04f4f"
+# --------------------------------------------------------------------------- color
+
+#: Interaction accent: navigation markers, focus, selection, the live lamp.
+ACCENT = "#3ab7c9"
+SIGNAL = ACCENT
+
+GRAPHITE = "#0f141a"  # window background (the housing)
+PANEL = "#141a22"  # panel / table header surface
+RAISED = "#1a222d"  # hover and secondary-button surface
+LINE = "#232c38"  # every hairline
+
+TEXT_HI = "#e9eef4"  # titles, values
+TEXT_MID = "#98a4b3"  # labels, secondary text
+TEXT_LOW = "#6b7683"  # hints, disabled
+
+# Severity: risk state only. Kept apart from the accent on purpose.
+LOW_COLOR = "#57b87d"
+SUSPICIOUS_COLOR = "#e3b23f"
+HIGH_COLOR = "#f08a3e"
+CRITICAL_COLOR = "#f0554f"
 
 SEVERITY_COLORS = {
     "low": LOW_COLOR,
@@ -20,154 +77,432 @@ SEVERITY_COLORS = {
     "critical": CRITICAL_COLOR,
 }
 
+# Families. The stylesheet may only name fonts that exist on every Windows
+# install; the application font is upgraded in apply_theme() when the OS has
+# a nicer alternative (Segoe UI Variable / Cascadia Mono).
+UI_FALLBACK = "Segoe UI"
+MONO_FALLBACK = "Consolas"
+_MONO_FAMILY = MONO_FALLBACK
+
+
+def resolve_families() -> tuple[str, str]:
+    """Return ``(ui, mono)`` families actually present on this machine."""
+    # QFontDatabase.hasFamily is callable on the class itself in Qt >= 6.9
+    # (constructing a QFontDatabase is deprecated).
+    ui = "Segoe UI Variable" if QFontDatabase.hasFamily("Segoe UI Variable") else UI_FALLBACK
+    mono = "Cascadia Mono" if QFontDatabase.hasFamily("Cascadia Mono") else MONO_FALLBACK
+    return ui, mono
+
+
+def mono_font(point_size: int = 0, *, bold: bool = False) -> QFont:
+    """A monospace font for identifiers (cached: called once per table cell)."""
+    font = QFont(_MONO_FAMILY)
+    if point_size:
+        font.setPointSize(point_size)
+    font.setBold(bold)
+    return font
+
+
+# -------------------------------------------------------------------- stylesheet
+
 STYLESHEET = """
-QWidget {
-    background-color: #14181f;
-    color: #d7dde5;
-    font-size: 13px;
+/* ---------------------------------------------------------------- structure */
+QMainWindow {
+    background-color: #0f141a;
 }
-QMainWindow, QDialog {
-    background-color: #14181f;
+QDialog, QMessageBox {
+    background-color: #141a22;
 }
-QLabel#pageTitle {
-    font-size: 20px;
-    font-weight: 600;
-    color: #f2f5f9;
-}
-QLabel#statValue {
-    font-size: 26px;
-    font-weight: 700;
-    color: #f2f5f9;
-}
-QLabel#statCaption {
-    font-size: 12px;
-    color: #8b95a3;
+QWidget#page {
+    background-color: #0f141a;
 }
 QFrame#sidebar {
-    background-color: #10141a;
-    border-right: 1px solid #232a34;
+    background-color: #0c1116;
+    border-right: 1px solid #232c38;
 }
-QPushButton#navButton {
-    text-align: left;
-    padding: 10px 14px;
+QFrame#rule {
+    background-color: #232c38;
+    min-height: 1px;
+    max-height: 1px;
     border: none;
-    border-radius: 6px;
-    background-color: transparent;
-    color: #aab3c0;
+}
+QFrame#stripDivider {
+    background-color: #232c38;
+    min-width: 1px;
+    max-width: 1px;
+    border: none;
+}
+QFrame#statusDot {
+    background-color: #4a5462;
+    border: none;
+    border-radius: 4px;
+    min-width: 8px;
+    max-width: 8px;
+    min-height: 8px;
+    max-height: 8px;
+}
+QFrame#statusDot[active="true"] {
+    background-color: #3ab7c9;
+}
+
+/* --------------------------------------------------------------- typography */
+QLabel#pageTitle {
+    font-size: 19px;
+    font-weight: 600;
+    color: #e9eef4;
+}
+QLabel#pageSubtitle {
     font-size: 13px;
+    color: #98a4b3;
+}
+QLabel#sectionTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #c8d2dd;
+    padding-top: 6px;
+}
+QLabel#hint {
+    font-size: 12px;
+    color: #6b7683;
+}
+QLabel#muted {
+    font-size: 12px;
+    color: #98a4b3;
+}
+QLabel#countLabel {
+    font-size: 12px;
+    font-weight: 600;
+    color: #98a4b3;
+}
+QLabel#errorLabel {
+    font-size: 12px;
+    color: #f0554f;
+}
+QLabel#fieldCaption {
+    font-size: 12px;
+    color: #98a4b3;
+}
+QLabel#fieldValue {
+    font-size: 13px;
+    color: #e9eef4;
+}
+QLabel#fieldMono {
+    font-size: 13px;
+    font-family: "Consolas";
+    color: #e9eef4;
+}
+QLabel#identityTitle {
+    font-size: 17px;
+    font-weight: 600;
+    color: #e9eef4;
+}
+QLabel#scoreLabel {
+    font-size: 17px;
+    font-weight: 700;
+}
+QLabel#brandTitle {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e9eef4;
+}
+QLabel#brandMeta {
+    font-size: 11px;
+    color: #6b7683;
+}
+QLabel#monitorState {
+    font-size: 11px;
+    color: #6b7683;
+}
+QLabel#statusLabel {
+    font-size: 12px;
+    color: #98a4b3;
+    padding-right: 12px;
+}
+QLabel#bodyText {
+    font-size: 13px;
+    color: #c8d2dd;
+}
+QLabel#detailBox {
+    background-color: #141a22;
+    border: 1px solid #232c38;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #c8d2dd;
+}
+
+/* ------------------------------------------------------------------- sidebar */
+QPushButton#navButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: #98a4b3;
+    font-size: 13px;
+    padding: 9px 12px;
+    text-align: left;
 }
 QPushButton#navButton:hover {
-    background-color: #1b2735;
-    color: #e6ebf2;
+    background-color: #131b24;
+    color: #dfe6ee;
+}
+QPushButton#navButton:focus {
+    border: 1px solid #2f6472;
 }
 QPushButton#navButton:checked {
-    background-color: #1f3350;
-    color: #ffffff;
+    background-color: #16222c;
+    border: 1px solid #24404e;
+    color: #e9eef4;
     font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ buttons */
+QPushButton {
+    background-color: #1a222d;
+    border: 1px solid #2b3542;
+    border-radius: 5px;
+    color: #dfe6ee;
+    font-size: 13px;
+    padding: 8px 14px;
+}
+QPushButton:hover {
+    background-color: #202a36;
+    border-color: #36424f;
+}
+QPushButton:pressed {
+    background-color: #151c25;
+}
+QPushButton:disabled {
+    background-color: #161d26;
+    border-color: #222b36;
+    color: #5c6673;
 }
 QPushButton#primaryButton {
-    background-color: __ACCENT__;
-    color: #ffffff;
+    background-color: #3ab7c9;
     border: none;
-    border-radius: 6px;
-    padding: 8px 16px;
+    color: #07141a;
+    font-size: 13px;
     font-weight: 600;
+    padding: 9px 16px;
 }
 QPushButton#primaryButton:hover {
-    background-color: #6ba0ff;
+    background-color: #52c9da;
+}
+QPushButton#primaryButton:pressed {
+    background-color: #2ea2b3;
 }
 QPushButton#primaryButton:disabled {
-    background-color: #2a3140;
-    color: #6b7482;
+    background-color: #1a222d;
+    color: #5c6673;
 }
 QPushButton#secondaryButton {
-    background-color: #1b2735;
-    border: 1px solid #2b3543;
-    border-radius: 6px;
-    padding: 7px 14px;
+    background-color: #1a222d;
+    border: 1px solid #2b3542;
+    color: #dfe6ee;
+    font-size: 13px;
+    padding: 8px 14px;
 }
 QPushButton#secondaryButton:hover {
-    background-color: #23303f;
+    background-color: #202a36;
+    border-color: #36424f;
 }
-QLineEdit, QSpinBox, QPlainTextEdit, QComboBox {
-    background-color: #10151c;
-    border: 1px solid #2a323e;
-    border-radius: 6px;
-    padding: 6px 8px;
-    selection-background-color: __ACCENT__;
+QPushButton#secondaryButton:pressed {
+    background-color: #151c25;
 }
-QLineEdit:focus, QSpinBox:focus, QPlainTextEdit:focus, QComboBox:focus {
-    border: 1px solid __ACCENT__;
+QPushButton#secondaryButton:disabled {
+    background-color: #161d26;
+    border-color: #222b36;
+    color: #5c6673;
 }
-QTableWidget, QTableView {
-    background-color: #0f131a;
-    alternate-background-color: #131923;
-    gridline-color: #1e2530;
-    border: 1px solid #232a34;
-    border-radius: 6px;
+
+/* ------------------------------------------------------------------- inputs */
+QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QTextEdit, QComboBox {
+    background-color: #10161d;
+    border: 1px solid #2b3542;
+    border-radius: 5px;
+    color: #e9eef4;
+    font-size: 13px;
+    padding: 6px 9px;
+    selection-background-color: #3ab7c9;
+    selection-color: #07141a;
 }
-QHeaderView::section {
-    background-color: #171d26;
-    color: #97a1b0;
-    padding: 6px 8px;
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QPlainTextEdit:focus,
+QTextEdit:focus, QComboBox:focus {
+    border: 1px solid #3ab7c9;
+}
+QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {
+    background-color: #141a22;
+    color: #5c6673;
+}
+QLineEdit#searchField {
+    padding-left: 10px;
+}
+QComboBox::drop-down {
+    background: transparent;
     border: none;
-    border-right: 1px solid #232a34;
-    border-bottom: 1px solid #232a34;
+    width: 22px;
+}
+QComboBox QAbstractItemView {
+    background-color: #141a22;
+    border: 1px solid #2b3542;
+    color: #e9eef4;
+    selection-background-color: #16222c;
+    selection-color: #e9eef4;
+}
+
+/* ------------------------------------------------------------------ tables */
+QTableView {
+    background-color: #11171e;
+    alternate-background-color: #141b24;
+    border: 1px solid #232c38;
+    border-radius: 6px;
+    color: #dfe6ee;
+    font-size: 13px;
+    gridline-color: #1d2530;
+    selection-background-color: #1b2f3b;
+    selection-color: #e9eef4;
+}
+QTableView::item {
+    border: none;
+    padding: 4px 6px;
 }
 QTableView::item:selected {
-    background-color: #1f3350;
-    color: #ffffff;
+    background-color: #1b2f3b;
+    color: #e9eef4;
 }
-QScrollBar:vertical {
-    background: #10141a;
-    width: 10px;
-    margin: 0;
-}
-QScrollBar::handle:vertical {
-    background: #2a323e;
-    border-radius: 5px;
-    min-height: 24px;
-}
-QStatusBar {
-    background-color: #10141a;
-    color: #8b95a3;
-    border-top: 1px solid #232a34;
-}
-QGroupBox {
-    border: 1px solid #232a34;
-    border-radius: 8px;
-    margin-top: 12px;
-    padding-top: 8px;
+QHeaderView::section {
+    background-color: #141a22;
+    border: none;
+    border-bottom: 1px solid #232c38;
+    border-right: 1px solid #1d2530;
+    color: #98a4b3;
+    font-size: 12px;
     font-weight: 600;
-    color: #c7cfda;
+    padding: 7px 8px;
+}
+QHeaderView::section:hover {
+    background-color: #1a222d;
+    color: #dfe6ee;
+}
+QTableCornerButton::section {
+    background-color: #141a22;
+    border: none;
+}
+
+/* --------------------------------------------------------------------- tabs */
+QTabWidget::pane {
+    background-color: #11171e;
+    border: 1px solid #232c38;
+    border-radius: 6px;
+    top: -1px;
+}
+QTabBar::tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #98a4b3;
+    font-size: 13px;
+    margin-right: 2px;
+    padding: 9px 14px;
+}
+QTabBar::tab:selected {
+    border-bottom: 2px solid #3ab7c9;
+    color: #e9eef4;
+    font-weight: 600;
+}
+QTabBar::tab:hover {
+    background-color: #151d26;
+    color: #c8d2dd;
+}
+
+/* ------------------------------------------------------------------ panels */
+QGroupBox {
+    background-color: #141a22;
+    border: 1px solid #232c38;
+    border-radius: 6px;
+    color: #e9eef4;
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 18px;
+    padding: 16px 14px 14px 14px;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
+    subcontrol-position: top left;
+    background-color: #141a22;
+    color: #98a4b3;
     left: 12px;
     padding: 0 6px;
+    top: 2px;
 }
-QTabWidget::pane {
-    border: 1px solid #232a34;
+QFrame#statStrip {
+    background-color: #141a22;
+    border: 1px solid #232c38;
     border-radius: 6px;
 }
-QTabBar::tab {
-    background: #10151c;
-    color: #97a1b0;
-    padding: 8px 16px;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
+QLabel#statValue {
+    font-size: 30px;
+    font-weight: 600;
+    color: #e9eef4;
 }
-QTabBar::tab:selected {
-    background: #1b2735;
-    color: #ffffff;
+QLabel#statCaption {
+    font-size: 12px;
+    color: #98a4b3;
+}
+
+/* ------------------------------------------------------------ chrome / misc */
+QStatusBar {
+    background-color: #0c1116;
+    border-top: 1px solid #232c38;
+    color: #98a4b3;
+    font-size: 12px;
 }
 QToolTip {
-    background-color: #1b2735;
-    color: #e6ebf2;
-    border: 1px solid #2b3543;
-    padding: 4px;
+    background-color: #1a222d;
+    border: 1px solid #2b3542;
+    color: #e9eef4;
+    font-size: 12px;
+    padding: 5px 8px;
 }
-""".replace("__ACCENT__", ACCENT)
+QScrollBar:vertical {
+    background: #0f141a;
+    border: none;
+    margin: 0;
+    width: 11px;
+}
+QScrollBar::handle:vertical {
+    background: #2b3542;
+    border-radius: 5px;
+    min-height: 28px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #3a4756;
+}
+QScrollBar:horizontal {
+    background: #0f141a;
+    border: none;
+    height: 11px;
+    margin: 0;
+}
+QScrollBar::handle:horizontal {
+    background: #2b3542;
+    border-radius: 5px;
+    min-width: 28px;
+}
+QScrollBar::handle:horizontal:hover {
+    background: #3a4756;
+}
+QScrollBar::add-line, QScrollBar::sub-line {
+    height: 0;
+    width: 0;
+    border: none;
+}
+QScrollBar::add-page, QScrollBar::sub-page {
+    background: transparent;
+}
+QAbstractScrollArea::corner {
+    background: transparent;
+}
+"""
 
 
 def stylesheet() -> str:
@@ -176,25 +511,30 @@ def stylesheet() -> str:
 
 
 def apply_theme(application: QApplication) -> None:
-    """Apply the dark theme and matching palette to ``application``."""
+    """Apply the instrument-panel theme and matching palette to ``application``."""
+    ui_family, mono_family = resolve_families()
+    global _MONO_FAMILY  # noqa: PLW0603 - module-level font cache for table cells
+    _MONO_FAMILY = mono_family
+
     application.setStyle("Fusion")
     application.setPalette(_dark_palette())
-    application.setFont(QFont("Segoe UI", 10))
+    application.setFont(QFont(ui_family, 10))
     application.setStyleSheet(STYLESHEET)
 
 
 def _dark_palette() -> QPalette:
     palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor("#14181f"))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor("#d7dde5"))
-    palette.setColor(QPalette.ColorRole.Base, QColor("#0f131a"))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#131923"))
-    palette.setColor(QPalette.ColorRole.Text, QColor("#d7dde5"))
-    palette.setColor(QPalette.ColorRole.Button, QColor("#1b2735"))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#d7dde5"))
+    palette.setColor(QPalette.ColorRole.Window, QColor(GRAPHITE))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor(TEXT_HI))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#11171e"))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#141b24"))
+    palette.setColor(QPalette.ColorRole.Text, QColor(TEXT_HI))
+    palette.setColor(QPalette.ColorRole.Button, QColor(RAISED))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor(TEXT_HI))
     palette.setColor(QPalette.ColorRole.Highlight, QColor(ACCENT))
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
-    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#1b2735"))
-    palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#e6ebf2"))
-    palette.setColor(QPalette.ColorRole.PlaceholderText, QColor("#6b7482"))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#07141a"))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(RAISED))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(TEXT_HI))
+    palette.setColor(QPalette.ColorRole.PlaceholderText, QColor(TEXT_LOW))
+    palette.setColor(QPalette.ColorRole.Dark, QColor(LINE))
     return palette

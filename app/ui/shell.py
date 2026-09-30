@@ -31,7 +31,8 @@ from app.ui.pages import (
     SettingsPage,
     TrustedNetworksPage,
 )
-from app.ui.theme import apply_theme
+from app.ui.theme import CRITICAL_COLOR, SUSPICIOUS_COLOR, TEXT_MID, apply_theme
+from app.ui.widgets import SignalMark, StatusLamp, hairline
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,10 @@ NAV_ITEMS: tuple[tuple[str, str], ...] = (
     ("settings", "Settings"),
     ("about", "About"),
 )
+
+#: Nav indices after which a hairline separates the next group
+#: (monitor / baseline / system).
+_NAV_BREAKS = frozenset({3, 5})
 
 
 class MainWindow(QMainWindow):
@@ -70,16 +75,30 @@ class MainWindow(QMainWindow):
 
         sidebar = QFrame()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(208)
+        sidebar.setFixedWidth(232)
         sidebar_layout = QVBoxLayout(sidebar)
-        sidebar_layout.setContentsMargins(12, 16, 12, 16)
+        sidebar_layout.setContentsMargins(14, 18, 14, 16)
         sidebar_layout.setSpacing(4)
 
-        brand = QLabel("Rogue AP Hunter")
-        brand.setStyleSheet(
-            "font-size: 15px; font-weight: 700; color: #f2f5f9; padding: 4px 6px 12px 6px;"
-        )
-        sidebar_layout.addWidget(brand)
+        # ---- brand: drawn RF mark + two-line identity -------------------
+        brand_row = QHBoxLayout()
+        brand_row.setSpacing(10)
+        brand_row.setContentsMargins(2, 0, 0, 0)
+        brand_row.addWidget(SignalMark())
+        brand_text = QVBoxLayout()
+        brand_text.setSpacing(0)
+        brand_title = QLabel("Rogue AP Hunter")
+        brand_title.setObjectName("brandTitle")
+        brand_meta = QLabel("Wi-Fi threat monitor")
+        brand_meta.setObjectName("brandMeta")
+        brand_text.addWidget(brand_title)
+        brand_text.addWidget(brand_meta)
+        brand_row.addLayout(brand_text)
+        brand_row.addStretch(1)
+        sidebar_layout.addLayout(brand_row)
+        sidebar_layout.addSpacing(10)
+        sidebar_layout.addWidget(hairline())
+        sidebar_layout.addSpacing(10)
 
         self._nav_group = QButtonGroup(self)
         self._nav_group.setExclusive(True)
@@ -93,6 +112,11 @@ class MainWindow(QMainWindow):
             self._nav_buttons[key] = button
             self._nav_keys.append(key)
             sidebar_layout.addWidget(button)
+            # Hairline group separators: monitor / baseline / system.
+            if index in _NAV_BREAKS:
+                sidebar_layout.addSpacing(8)
+                sidebar_layout.addWidget(hairline())
+                sidebar_layout.addSpacing(8)
 
         sidebar_layout.addStretch(1)
 
@@ -108,16 +132,21 @@ class MainWindow(QMainWindow):
         self._scan_once_button.clicked.connect(self.scan_once)
         sidebar_layout.addWidget(self._scan_once_button)
 
+        state_row = QHBoxLayout()
+        state_row.setSpacing(8)
+        state_row.setContentsMargins(4, 4, 4, 0)
+        self._lamp = StatusLamp(active=False)
+        state_row.addWidget(self._lamp)
         self._monitor_state = QLabel("Monitoring is off")
+        self._monitor_state.setObjectName("monitorState")
         self._monitor_state.setWordWrap(True)
-        self._monitor_state.setStyleSheet("color: #6b7482; font-size: 11px; padding: 4px;")
-        sidebar_layout.addWidget(self._monitor_state)
+        state_row.addWidget(self._monitor_state, 1)
+        sidebar_layout.addLayout(state_row)
 
         central_layout.addWidget(sidebar)
 
         # ---- pages -------------------------------------------------------
         self._stack = QStackedWidget()
-        self._stack.setStyleSheet("QStackedWidget { background-color: #14181f; }")
 
         self._dashboard = DashboardPage(context)
         self._live = LiveNetworksPage(context)
@@ -148,7 +177,7 @@ class MainWindow(QMainWindow):
         status = self.statusBar()
         status.showMessage("Ready \u00b7 monitoring is off")
         self._alert_indicator = QLabel("0 open alerts")
-        self._alert_indicator.setStyleSheet("color: #8b95a3; padding-right: 12px;")
+        self._alert_indicator.setObjectName("statusLabel")
         status.addPermanentWidget(self._alert_indicator)
 
         # ---- wiring ------------------------------------------------------
@@ -250,8 +279,10 @@ class MainWindow(QMainWindow):
 
     def _set_monitor_state(self, running: bool, detail: str = "") -> None:
         self._monitor_button.setText("Stop monitoring" if running else "Start monitoring")
+        self._lamp.set_active(running)
         self._monitor_state.setText(
-            ("Monitoring is on" if running else "Monitoring is off") + (f" \u00b7 {detail}" if detail else "")
+            ("Monitoring is on" if running else "Monitoring is off")
+            + (f" \u00b7 {detail}" if detail else "")
         )
 
     # ------------------------------------------------------------- events
@@ -290,8 +321,8 @@ class MainWindow(QMainWindow):
         if critical:
             label += f" \u00b7 {critical} critical"
         self._alert_indicator.setText(label)
-        color = "#e04f4f" if critical else ("#e0a63a" if total else "#8b95a3")
-        self._alert_indicator.setStyleSheet(f"color: {color}; padding-right: 12px;")
+        color = CRITICAL_COLOR if critical else (SUSPICIOUS_COLOR if total else TEXT_MID)
+        self._alert_indicator.setStyleSheet(f"color: {color};")
 
     @Slot(object)
     def open_investigation(self, ssid: object, bssid: object) -> None:

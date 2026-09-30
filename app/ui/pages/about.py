@@ -82,7 +82,7 @@ class AboutPage(Page):
         text.setWordWrap(True)
         text.setTextFormat(Qt.TextFormat.RichText)
         text.setOpenExternalLinks(False)
-        text.setStyleSheet("color: #d7dde5; font-size: 13px; line-height: 150%;")
+        text.setObjectName("bodyText")
         text.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(text)
         layout.addStretch(1)

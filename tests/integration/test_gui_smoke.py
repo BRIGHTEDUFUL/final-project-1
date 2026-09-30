@@ -226,11 +226,57 @@ def test_trusted_page_add_and_delete(window: MainWindow, context: AppContext) ->
 
 def test_stylesheet_contains_core_rules() -> None:
     sheet = stylesheet()
-    for token in ("#14181f", "QTableView", "QPushButton#primaryButton", "__ACCENT__"):
-        if token == "__ACCENT__":
-            assert token not in sheet, "placeholder must be substituted"
-        else:
-            assert token in sheet
+    for token in ("#0f141a", "#3ab7c9", "QTableView", "QPushButton#primaryButton"):
+        assert token in sheet
+    assert "__ACCENT__" not in sheet, "placeholder must not leak"
+
+
+def test_stylesheet_never_styles_widgets_globally() -> None:
+    """Regression: a global ``QWidget``/``QFrame`` rule paints phantom boxes
+    behind every child label (QLabel inherits QFrame). Backgrounds must be
+    scoped to a container class or an object name."""
+    sheet = stylesheet()
+    assert "QWidget {" not in sheet
+    assert "QFrame {" not in sheet
+    assert "QLabel {" not in sheet
+
+
+def test_severity_colour_is_scoped_to_its_own_column() -> None:
+    """Only the severity cell is tinted; identifiers stay neutral."""
+    from PySide6.QtCore import Qt as _Qt
+    from PySide6.QtGui import QColor
+
+    from app.ui.table_models import ColumnTableModel
+
+    model = ColumnTableModel(
+        [
+            ("Severity", lambda row: row["severity"], None),
+            ("BSSID", lambda row: row["bssid"], None),
+        ]
+    )
+    model.set_color_column(0, lambda row: row["severity"])
+    model.set_rows([{"severity": "critical", "bssid": "aa:bb:cc:dd:ee:ff"}])
+
+    severity_index = model.index(0, 0)
+    bssid_index = model.index(0, 1)
+    foreground = model.data(severity_index, _Qt.ItemDataRole.ForegroundRole)
+    assert isinstance(foreground, QColor)
+    assert foreground.name() != "#000000"
+    assert model.data(bssid_index, _Qt.ItemDataRole.ForegroundRole) is None
+
+
+def test_mono_columns_request_a_monospace_font() -> None:
+    from PySide6.QtCore import Qt as _Qt
+    from PySide6.QtGui import QFont
+
+    from app.ui.table_models import ColumnTableModel
+
+    model = ColumnTableModel([("BSSID", lambda row: row, None)])
+    model.set_mono_columns(0)
+    model.set_rows(["aa:bb:cc:dd:ee:ff"])
+    font = model.data(model.index(0, 0), _Qt.ItemDataRole.FontRole)
+    assert isinstance(font, QFont)
+    assert font.family() in {"Consolas", "Cascadia Mono"}
 
 
 def test_dialog_code_enum_is_usable() -> None:

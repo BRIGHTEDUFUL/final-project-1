@@ -14,6 +14,8 @@ from typing import Any
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 from PySide6.QtGui import QColor
 
+from app.ui.theme import SEVERITY_COLORS, mono_font
+
 __all__ = ["Column", "ColumnTableModel", "color_for_severity"]
 
 EM_DASH = "\u2014"
@@ -25,13 +27,8 @@ def color_for_severity(value: str | None) -> QColor | None:
     """Return a readable text colour for a severity name, if recognised."""
     if not value:
         return None
-    palette = {
-        "low": QColor("#3fae6b"),
-        "suspicious": QColor("#e0a63a"),
-        "high": QColor("#e07a3f"),
-        "critical": QColor("#e04f4f"),
-    }
-    return palette.get(value.lower())
+    color = SEVERITY_COLORS.get(value.lower())
+    return QColor(color) if color else None
 
 
 class ColumnTableModel(QAbstractTableModel):
@@ -47,13 +44,22 @@ class ColumnTableModel(QAbstractTableModel):
         self._rows: list[Any] = []
         self._color_index = -1
         self._color_getter: Callable[[Any], str | None] | None = None
+        self._mono_columns: set[int] = set()
 
     # ------------------------------------------------------------ configuration
 
     def set_color_column(self, index: int, getter: Callable[[Any], str | None]) -> None:
-        """Colour the whole row according to ``getter(row)`` (severity)."""
+        """Colour the cells of column ``index`` with ``getter(row)``'s severity.
+
+        Only the severity column is tinted: identifiers, timestamps and
+        evidence stay neutral so a table never turns into a wall of colour.
+        """
         self._color_index = index
         self._color_getter = getter
+
+    def set_mono_columns(self, *indices: int) -> None:
+        """Render ``indices`` (identifiers, timestamps) in a monospace font."""
+        self._mono_columns = {index for index in indices if 0 <= index < len(self._columns)}
 
     # ----------------------------------------------------------------- data
 
@@ -113,9 +119,16 @@ class ColumnTableModel(QAbstractTableModel):
             return column[2](row)
 
         if role == Qt.ItemDataRole.ForegroundRole and self._color_getter is not None:
+            # Scope the severity colour to its own column; whole-row tinting
+            # made identifiers and timestamps unreadable.
+            if index.column() != self._color_index:
+                return None
             color = color_for_severity(self._color_getter(row))
             if color is not None:
                 return color
+
+        if role == Qt.ItemDataRole.FontRole and index.column() in self._mono_columns:
+            return mono_font()
 
         return None
 

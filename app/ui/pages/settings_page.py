@@ -91,7 +91,7 @@ class SettingsPage(Page):
         threshold_layout.addWidget(QLabel("Critical \u2265"), 0, 4)
         threshold_layout.addWidget(self._critical, 0, 5)
         note = QLabel("Low is anything below the suspicious threshold.")
-        note.setStyleSheet("color: #6b7482; font-size: 12px;")
+        note.setObjectName("hint")
         threshold_layout.addWidget(note, 1, 0, 1, 6)
         self.body.addWidget(threshold_box)
 
@@ -111,7 +111,7 @@ class SettingsPage(Page):
             "Each distinct rule contributes its weight once per identity, "
             "clamped to a 0\u2013100 total."
         )
-        weights_note.setStyleSheet("color: #6b7482; font-size: 12px;")
+        weights_note.setObjectName("hint")
         weights_note.setWordWrap(True)
         weights_form.addWidget(weights_note, 4, 0, 1, 3)
         self.body.addWidget(weights_box)
@@ -126,7 +126,7 @@ class SettingsPage(Page):
             "one-minute cooldown per alert. The in-app alert list is always complete."
         )
         notify_hint.setWordWrap(True)
-        notify_hint.setStyleSheet("color: #6b7482; font-size: 12px;")
+        notify_hint.setObjectName("hint")
         notify_form.addRow(notify_hint)
         self.body.addWidget(notify_box)
 
@@ -139,13 +139,17 @@ class SettingsPage(Page):
         self._reset_button.setObjectName("secondaryButton")
         self._reset_button.clicked.connect(self.refresh)
         self._path_label = QLabel(str(self._context.config_path))
-        self._path_label.setStyleSheet("color: #6b7482; font-size: 12px;")
+        self._path_label.setObjectName("hint")
         actions.addWidget(self._save_button)
         actions.addWidget(self._reset_button)
         actions.addStretch(1)
         actions.addWidget(self._path_label)
         self.body.addLayout(actions)
         self.body.addStretch(1)
+
+        # Five group boxes plus the action row never fit a short window:
+        # make the whole form reachable by scrolling instead of clipping.
+        self.make_scrollable()
 
         self.refresh()
 

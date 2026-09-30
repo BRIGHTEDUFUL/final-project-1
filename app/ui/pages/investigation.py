@@ -26,12 +26,18 @@ from app.core.context import AppContext
 from app.models import NetworkObservation, TrustedNetwork
 from app.services.views import severity_name
 from app.ui.pages.base import Page
-from app.ui.theme import SEVERITY_COLORS
+from app.ui.theme import ACCENT, LINE, SEVERITY_COLORS, TEXT_LOW, TEXT_MID
 from app.ui.widgets import SeverityBadge
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["InvestigationPage"]
+
+#: Facts that are identifiers or timestamps (rendered in monospace).
+_MONO_FACTS = frozenset({"first_seen", "last_seen", "baseline"})
+
+#: Chart colours: the tab-pane surface, the hairline and the signal accent.
+CHART_SURFACE = "#11171e"
 
 try:  # Matplotlib is optional at import time so headless tools keep working.
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as _FigureCanvas
@@ -63,9 +69,9 @@ class InvestigationPage(Page):
         header = QHBoxLayout()
         header.setSpacing(12)
         self._title = QLabel("No identity selected")
-        self._title.setStyleSheet("font-size: 17px; font-weight: 600; color: #f2f5f9;")
+        self._title.setObjectName("identityTitle")
         self._score = QLabel("")
-        self._score.setStyleSheet("font-size: 17px; font-weight: 700;")
+        self._score.setObjectName("scoreLabel")
         self._badge = SeverityBadge("")
         header.addWidget(self._title, 1)
         header.addWidget(self._score)
@@ -96,12 +102,14 @@ class InvestigationPage(Page):
         for index, (key, caption) in enumerate(fact_keys):
             row, column = divmod(index, 2)
             caption_label = QLabel(caption)
-            caption_label.setStyleSheet("color: #8b95a3;")
+            caption_label.setObjectName("fieldCaption")
             value = QLabel("\u2014")
+            # Identifiers and timestamps align in monospace.
+            value.setObjectName("fieldMono" if key in _MONO_FACTS else "fieldValue")
             value.setWordWrap(True)
             value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            facts.addWidget(caption_label, row * 2, column)
-            facts.addWidget(value, row * 2 + 1, column)
+            facts.addWidget(caption_label, row, column * 2)
+            facts.addWidget(value, row, column * 2 + 1)
             self._facts[key] = value
         facts.setColumnStretch(1, 1)
         facts.setColumnStretch(3, 1)
@@ -135,7 +143,7 @@ class InvestigationPage(Page):
             chart_layout = QVBoxLayout(self._chart_host)
             chart_layout.setContentsMargins(0, 6, 0, 0)
             self._figure = _Figure(figsize=(6, 2.4), tight_layout=True)
-            self._figure.patch.set_facecolor("#0f131a")
+            self._figure.patch.set_facecolor(CHART_SURFACE)
             self._canvas = _FigureCanvas(self._figure)
             chart_layout.addWidget(self._canvas)
             tabs.addTab(self._chart_host, "Signal history")
@@ -183,8 +191,9 @@ class InvestigationPage(Page):
         severity = str(latest_score["severity"]) if latest_score else None
 
         self._score.setText(f"score {score_value}" if score_value is not None else "")
+        # Colour only: size and weight live in the #scoreLabel theme rule.
         self._score.setStyleSheet(
-            f"font-size: 17px; font-weight: 700; color: {SEVERITY_COLORS.get(severity or '', '#d7dde5')};"
+            f"color: {SEVERITY_COLORS.get(severity or '', TEXT_MID)};"
         )
         self._badge.set_text(severity or "")
 
@@ -312,10 +321,10 @@ class InvestigationPage(Page):
             return
         self._figure.clear()
         axis = self._figure.add_subplot(111)
-        axis.set_facecolor("#0f131a")
+        axis.set_facecolor(CHART_SURFACE)
         for spine in axis.spines.values():
-            spine.set_color("#2a323e")
-        axis.tick_params(colors="#97a1b0", labelsize=8)
+            spine.set_color(LINE)
+        axis.tick_params(colors=TEXT_MID, labelsize=8)
 
         points = [
             observation
@@ -326,16 +335,16 @@ class InvestigationPage(Page):
             points.sort(key=lambda o: o.observed_at)
             xs = [observation.observed_at for observation in points]
             ys = [observation.signal_strength for observation in points]
-            axis.plot(xs, ys, color="#4f8cff", linewidth=1.6, marker="o", markersize=3)
+            axis.plot(xs, ys, color=ACCENT, linewidth=1.6, marker="o", markersize=3)
             axis.set_ylim(0, 105)
-            axis.set_ylabel("Signal %", color="#97a1b0", fontsize=9)
-            axis.grid(True, color="#1e2530", linewidth=0.7)
+            axis.set_ylabel("Signal %", color=TEXT_MID, fontsize=9)
+            axis.grid(True, color=LINE, linewidth=0.7)
         else:
             axis.text(
                 0.5,
                 0.5,
                 "No signal readings recorded",
-                color="#6b7482",
+                color=TEXT_LOW,
                 ha="center",
                 va="center",
                 transform=axis.transAxes,

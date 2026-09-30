@@ -14,9 +14,12 @@ from app.core.context import AppContext
 from app.ui.pages.base import Page, section_title
 from app.ui.table_models import ColumnTableModel
 from app.ui.theme import SEVERITY_COLORS
-from app.ui.widgets import StatCard, styled_table
+from app.ui.widgets import StatCard, stat_strip, styled_table
 
 __all__ = ["DashboardPage"]
+
+#: Environment fields whose values are identifiers or timestamps.
+_MONO_FIELDS = frozenset({"bssid", "last_scan"})
 
 
 def _severity_of(alert: object) -> str | None:
@@ -35,18 +38,15 @@ class DashboardPage(Page):
         )
         self._context = context
 
-        # ---- stat cards -------------------------------------------------
-        cards = QGridLayout()
-        cards.setSpacing(12)
-        self._visible_card = StatCard("Networks in last scan")
-        self._trusted_card = StatCard("Trusted networks")
-        self._alerts_card = StatCard("Open alerts")
-        self._critical_card = StatCard("Critical alerts")
-        for index, card in enumerate(
-            (self._visible_card, self._trusted_card, self._alerts_card, self._critical_card)
-        ):
-            cards.addWidget(card, 0, index)
-        self.body.addLayout(cards)
+        # ---- instrument strip: one panel, four readouts, hairline dividers ----
+        cards = (
+            StatCard("Networks in last scan"),
+            StatCard("Trusted networks"),
+            StatCard("Open alerts"),
+            StatCard("Critical alerts"),
+        )
+        self._visible_card, self._trusted_card, self._alerts_card, self._critical_card = cards
+        self.body.addWidget(stat_strip(cards))
 
         # ---- environment ------------------------------------------------
         environment = QGroupBox("Current environment")
@@ -66,13 +66,15 @@ class DashboardPage(Page):
         )
         for row, (key, caption) in enumerate(fields):
             label_caption = QLabel(caption)
-            label_caption.setStyleSheet("color: #8b95a3;")
+            label_caption.setObjectName("fieldCaption")
             value = QLabel("\u2014")
+            # Identifiers and timestamps are set in monospace so they align.
+            value.setObjectName("fieldMono" if key in _MONO_FIELDS else "fieldValue")
             value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             grid_row = row // 2
             grid_col = row % 2
-            environment_layout.addWidget(label_caption, grid_row * 2, grid_col)
-            environment_layout.addWidget(value, grid_row * 2 + 1, grid_col)
+            environment_layout.addWidget(label_caption, grid_row, grid_col * 2)
+            environment_layout.addWidget(value, grid_row, grid_col * 2 + 1)
             self._environment_labels[key] = value
         environment_layout.setColumnStretch(1, 1)
         environment_layout.setColumnStretch(3, 1)
@@ -97,11 +99,14 @@ class DashboardPage(Page):
             ]
         )
         self._alerts_model.set_color_column(0, _severity_of)
-        self._alerts_table = styled_table(self._alerts_model)
+        self._alerts_model.set_mono_columns(4, 7)
+        # Evidence (index 5) is the long text column: let it absorb the slack
+        # instead of stretching "First seen" and pushing Status off-screen.
+        self._alerts_table = styled_table(self._alerts_model, flex=5)
         self.body.addWidget(self._alerts_table)
 
         hint = QLabel("Use Investigation for the full reasoning behind any score.")
-        hint.setStyleSheet("color: #6b7482; font-size: 12px;")
+        hint.setObjectName("hint")
         self.body.addWidget(hint)
 
     # ----------------------------------------------------------------- data

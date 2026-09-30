@@ -40,7 +40,7 @@ class HistoryPage(Page):
         self._export_button.setObjectName("secondaryButton")
         self._export_button.clicked.connect(self._export)
         self._session_label = QLabel("0 sessions")
-        self._session_label.setStyleSheet("color: #8b95a3;")
+        self._session_label.setObjectName("countLabel")
         toolbar.addStretch(1)
         toolbar.addWidget(self._session_label)
         toolbar.addWidget(self._export_button)
@@ -64,7 +64,11 @@ class HistoryPage(Page):
                 ("Networks", lambda s: s.network_count, None),
             ]
         )
-        self._session_table = styled_table(self._session_model)
+        # Stretch "Started" (a left-aligned timestamp), not the trailing
+        # numeric "Networks" column: stretching a right-aligned number
+        # detaches it from its header.
+        self._session_model.set_mono_columns(1, 2)
+        self._session_table = styled_table(self._session_model, flex=1)
         self._session_table.setMaximumHeight(220)
         self.body.addWidget(self._session_table)
 
@@ -83,7 +87,9 @@ class HistoryPage(Page):
                 ("Channel", lambda o: o.channel, None),
             ]
         )
-        self._obs_table = styled_table(self._obs_model)
+        self._obs_model.set_mono_columns(0, 2)
+        # Stretch "SSID" (left-aligned text) rather than the numeric "Channel".
+        self._obs_table = styled_table(self._obs_model, flex=1)
         self._obs_table.doubleClicked.connect(self._open_investigation)
         self.body.addWidget(self._obs_table)
 

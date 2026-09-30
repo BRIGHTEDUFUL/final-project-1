@@ -67,7 +67,7 @@ class AlertsPage(Page):
         self._export_button.clicked.connect(self._export_csv)
 
         self._count_label = QLabel("0 alerts")
-        self._count_label.setStyleSheet("color: #8b95a3;")
+        self._count_label.setObjectName("countLabel")
 
         toolbar.addWidget(self._status_filter)
         toolbar.addWidget(self._severity_filter)
@@ -104,16 +104,14 @@ class AlertsPage(Page):
             ]
         )
         self._model.set_color_column(0, lambda alert: alert.severity.value if alert.severity else None)
+        self._model.set_mono_columns(4, 7, 8)
         self._table = styled_table(self._model)
         self._table.doubleClicked.connect(self._open_investigation)
         self.body.addWidget(self._table)
 
         self._detail = QLabel("Select an alert to see its full evidence here.")
         self._detail.setWordWrap(True)
-        self._detail.setStyleSheet(
-            "background-color: #171d26; border: 1px solid #232a34;"
-            " border-radius: 8px; padding: 10px; color: #c7cfda;"
-        )
+        self._detail.setObjectName("detailBox")
         self.body.addWidget(self._detail)
 
     # ----------------------------------------------------------------- data
@@ -158,7 +156,7 @@ class AlertsPage(Page):
             return
         severity = alert.severity.value if alert.severity else "?"
         self._detail.setText(
-            f"<b>[{severity.upper()}] {alert.alert_type.value.replace('_', ' ')} "
+            f"<b>[{severity.capitalize()}] {alert.alert_type.value.replace('_', ' ')} "
             f"\u2014 score {alert.risk_score}</b><br/>"
             f"{alert.ssid or '&lt;hidden&gt;'} [{alert.bssid or 'unknown BSSID'}]"
             f"<br/>{alert.evidence}"

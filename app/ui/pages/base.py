@@ -1,13 +1,15 @@
 """Shared page scaffolding.
 
 Every screen derives from :class:`Page`, which guarantees a consistent header
-(title + subtitle) and a ``refresh()`` hook the shell calls after each scan.
+(title + subtitle + hairline rule) and a ``refresh()`` hook the shell calls
+after each scan.
 """
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
+
+from app.ui.widgets import hairline
 
 __all__ = ["Page", "section_title"]
 
@@ -22,9 +24,10 @@ class Page(QWidget):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self.setObjectName("page")
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(24, 20, 24, 20)
-        self._layout.setSpacing(12)
+        self._layout.setContentsMargins(28, 24, 28, 24)
+        self._layout.setSpacing(10)
 
         heading = QLabel(title)
         heading.setObjectName("pageTitle")
@@ -32,10 +35,13 @@ class Page(QWidget):
 
         if subtitle:
             caption = QLabel(subtitle)
-            caption.setObjectName("statCaption")
+            caption.setObjectName("pageSubtitle")
             caption.setWordWrap(True)
-            caption.setStyleSheet("color: #8b95a3; font-size: 13px;")
             self._layout.addWidget(caption)
+
+        # The hairline separates header from body so every screen has the
+        # same structural anchor.
+        self._layout.addWidget(hairline())
 
         self._body = QVBoxLayout()
         self._body.setSpacing(10)
@@ -54,14 +60,42 @@ class Page(QWidget):
         """Called when the page becomes visible or a scan completes."""
 
     def on_scan_report(self, report: object) -> None:
-        """Called for every completed scan while monitoring runs."""
+        """Called after every completed scan; pages with tables reload here."""
+        self.refresh()
+
+    def make_scrollable(self) -> None:
+        """Move the body into a scroll area.
+
+        Used by screens whose fixed content (forms, group boxes) can exceed
+        short windows — without this, the trailing sections are simply
+        clipped with no way to reach them.
+        """
+        scroll = QScrollArea()
+        scroll.setObjectName("pageScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setFrameShadow(QScrollArea.Shadow.Plain)
+
+        content = QWidget()
+        content.setObjectName("pageScrollContent")
+        inner = QVBoxLayout(content)
+        inner.setContentsMargins(0, 0, 0, 0)
+        inner.setSpacing(10)
+        scroll.setWidget(content)
+
+        while self._body.count():
+            item = self._body.takeAt(0)
+            if item.widget() is not None:
+                inner.addWidget(item.widget())
+            elif item.layout() is not None:
+                inner.addLayout(item.layout())
+            del item
+        inner.addStretch(1)
+        self._body.addWidget(scroll, 1)
 
 
-def section_title(text: str) -> QLabel:
-    """Create a small section heading used inside pages."""
-    label = QLabel(text)
-    label.setStyleSheet(
-        "font-size: 14px; font-weight: 600; color: #c7cfda; margin-top: 8px;"
-    )
-    label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+def section_title(text: str, parent: QWidget | None = None) -> QLabel:
+    """A quiet section heading (see ``QLabel#sectionTitle``)."""
+    label = QLabel(text, parent)
+    label.setObjectName("sectionTitle")
     return label

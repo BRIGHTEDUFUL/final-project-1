@@ -44,6 +44,7 @@ class LiveNetworksPage(Page):
         toolbar.setSpacing(8)
 
         self._search = QLineEdit()
+        self._search.setObjectName("searchField")
         self._search.setPlaceholderText("Filter by SSID or BSSID\u2026")
         self._search.setClearButtonEnabled(True)
         self._search.setMaximumWidth(320)
@@ -58,7 +59,7 @@ class LiveNetworksPage(Page):
         self._refresh_button.clicked.connect(self.refresh)
 
         self._count_label = QLabel("0 networks")
-        self._count_label.setStyleSheet("color: #8b95a3;")
+        self._count_label.setObjectName("countLabel")
 
         toolbar.addWidget(self._search, 1)
         toolbar.addWidget(self._filter)
@@ -86,6 +87,7 @@ class LiveNetworksPage(Page):
             ]
         )
         self._model.set_color_column(7, lambda snapshot: snapshot.severity)
+        self._model.set_mono_columns(1, 8)
         self._table = styled_table(self._model)
         self._table.doubleClicked.connect(self._open_investigation)
         self.body.addWidget(self._table)
@@ -93,7 +95,7 @@ class LiveNetworksPage(Page):
         self._empty_hint = QLabel(
             "No networks yet \u2014 start monitoring or press Refresh to scan once."
         )
-        self._empty_hint.setStyleSheet("color: #6b7482;")
+        self._empty_hint.setObjectName("hint")
         self.body.addWidget(self._empty_hint)
 
     # ----------------------------------------------------------------- data

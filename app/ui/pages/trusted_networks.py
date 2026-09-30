@@ -88,7 +88,7 @@ class TrustedNetworkDialog(QDialog):
 
         self._error = QLabel("")
         self._error.setWordWrap(True)
-        self._error.setStyleSheet("color: #e04f4f;")
+        self._error.setObjectName("errorLabel")
         self._error.setVisible(False)
         layout.addWidget(self._error)
 
@@ -157,7 +157,7 @@ class TrustedNetworksPage(Page):
         self._delete_button.setObjectName("secondaryButton")
         self._delete_button.clicked.connect(self._delete)
         self._count_label = QLabel("0 networks")
-        self._count_label.setStyleSheet("color: #8b95a3;")
+        self._count_label.setObjectName("countLabel")
 
         toolbar.addWidget(self._add_button)
         toolbar.addWidget(self._edit_button)
@@ -192,7 +192,7 @@ class TrustedNetworksPage(Page):
             "Without a baseline, only structural indicators (duplicate names, unusual signal) can fire."
         )
         hint.setWordWrap(True)
-        hint.setStyleSheet("color: #6b7482; font-size: 12px;")
+        hint.setObjectName("hint")
         self.body.addWidget(hint)
 
     # ----------------------------------------------------------------- data
