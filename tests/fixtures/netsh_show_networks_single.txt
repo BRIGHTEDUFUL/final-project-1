@@ -1,0 +1,19 @@
+ 
+Interface name : Wi-Fi 
+There are 1 networks currently visible. 
+
+SSID 1 : Unknown ip
+    Network type            : Infrastructure
+    Authentication          : WPA3-Personal
+    Encryption              : CCMP 
+    BSSID 1                 : 6a:0e:65:aa:3f:c9
+         Signal             : 100%  
+         Radio type         : 802.11ax
+         Band               : 5 GHz
+         Channel            : 149 
+         Details            :  (H2E supported) 
+         QoS MSCS Supported    : 0
+         QoS Map Supported     : 0
+         Basic rates (Mbps) : 6 12 24
+         Other rates (Mbps) : 9 18 36 48 54
+

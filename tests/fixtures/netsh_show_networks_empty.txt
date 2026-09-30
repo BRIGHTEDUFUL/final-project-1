@@ -1,0 +1,4 @@
+
+Interface name : Wi-Fi
+There are 0 networks currently visible.
+

@@ -1,0 +1,25 @@
+
+There is 1 interface on the system:
+
+    Name                   : Wi-Fi
+    Description            : Killer Wireless-n/a/ac 1535 Wireless Network Adapter
+    GUID                   : f00e0d90-a66d-40d0-be1e-55512e2c9ed3
+    Physical address       : 9c:b6:d0:ec:ce:4d
+    Interface type         : Primary
+    State                  : connected
+    SSID                   : Unknown ip
+    AP BSSID               : 6a:0e:65:aa:3f:c9
+    Band                   : 5 GHz
+    Channel                : 149
+    Connected Akm-cipher   : [ akm = 00-0f-ac:08, cipher =  00-0f-ac:04 ]
+    Network type           : Infrastructure
+    Radio type             : 802.11ac
+    Authentication         : WPA3-Personal
+    Cipher                 : CCMP
+    Connection mode        : Auto Connect
+    Receive rate (Mbps)    : 866.7
+    Transmit rate (Mbps)   : 866.7
+    Signal                 : 100%
+    Rssi                   : -42
+    Profile                : Unknown ip
+    QoS MSCS Configured         : 0

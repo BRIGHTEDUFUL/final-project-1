@@ -1,0 +1,24 @@
+
+Interface name : Wi-Fi
+There are 2 networks currently visible.
+
+SSID 1 : HomeLab
+    Network type            : Infrastructure
+    Authentication          : Open
+    Encryption              : WEP
+    BSSID 1                 : de:ad:be:ef:00:01
+         Signal             : 71%
+         Channel            : 11
+
+Garbage line without any separator at all
+:::::
+    SomeUnknownLabel        : some value
+    Signal                 : not-a-percent
+    Channel                : abc
+
+SSID 2 : Broken
+    Authentication          : WPA3-SAE
+    BSSID 1                 : this-is-not-a-mac
+         Signal             : 65%
+    BSSID 2                 : de:ad:be:ef:00:02
+         Channel            : 44

@@ -1,0 +1,34 @@
+
+Interface name : Wi-Fi
+There are 3 networks currently visible.
+
+SSID 1 : Corporate
+    Network type            : Infrastructure
+    Authentication          : WPA2-Enterprise
+    Encryption              : CCMP
+    BSSID 1                 : 10:20:30:40:50:60
+         Signal             : 88%
+         Radio type         : 802.11ac
+         Channel            : 36
+    BSSID 2                 : 10-20-30-40-50-61
+         Signal             : 54%
+         Radio type         : 802.11n
+         Channel            : 44
+
+SSID 2 :
+    Network type            : Infrastructure
+    Authentication          : WPA2-Personal
+    Encryption              : CCMP
+    BSSID 1                 : aa:bb:cc:dd:ee:ff
+         Signal             : 37%
+         Channel            : 6
+
+SSID 3 : Guest
+    Network type            : Infrastructure
+    Authentication          : Open
+    Encryption              : None
+    BSSID 1                 : 11:22:33:44:55:66
+         Signal             : 200%
+         Radio type         : 802.11g
+         Channel            : 999
+
