@@ -10,7 +10,6 @@ from __future__ import annotations
 import csv
 import logging
 from collections.abc import Iterable, Sequence
-from datetime import datetime
 from pathlib import Path
 
 from app.models import Alert, NetworkObservation
@@ -112,7 +111,3 @@ def export_alerts_csv(path: Path | str, alerts: Iterable[Alert]) -> Path:
 def export_observations_csv(path: Path | str, observations: Iterable[NetworkObservation]) -> Path:
     """Write observations to ``path`` and return the file location."""
     return _write_csv(Path(path), OBSERVATION_COLUMNS, (_observation_row(o) for o in observations))
-
-
-def _unused(_: datetime) -> None:  # pragma: no cover - import stability helper
-    return None

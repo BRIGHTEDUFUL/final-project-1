@@ -1,9 +1,7 @@
-"""PySide6 user interface package.
+"""Graphical interface: screens, models and the main window.
 
-Business logic must stay outside widgets: screens call services and display
-state, they never run detection or database code directly.
+Importing this package does not create widgets; import the module you need
+(for example ``app.ui.shell``).
 """
 
 from __future__ import annotations
-
-__all__: list[str] = []

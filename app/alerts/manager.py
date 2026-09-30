@@ -76,6 +76,21 @@ class AlertManager:
         self._clock = clock
         self._last_notified: dict[tuple[str | None, str | None, str], datetime] = {}
 
+    @property
+    def notifier(self) -> Notifier | None:
+        """Notification channel in use (``None`` disables desktop alerts)."""
+        return self._notifier
+
+    @property
+    def notify_below_severity(self) -> Severity:
+        """Lowest severity that triggers a desktop notification."""
+        return self._notify_below
+
+    @property
+    def repository(self) -> AlertRepository:
+        """Backing alert storage."""
+        return self._repository
+
     # ------------------------------------------------------------- recording
 
     def record(self, alert: Alert) -> AlertTransition:

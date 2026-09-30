@@ -565,6 +565,23 @@ class RiskScoreRepository:
             history.append(entry)
         return history
 
+    def latest_scores(self, limit: int = 500) -> list[dict[str, Any]]:
+        """Most recent score per identity, newest first (one row each)."""
+        rows = self._db.query(
+            "SELECT * FROM risk_scores ORDER BY created_at DESC, id DESC LIMIT ?",
+            (max(1, int(limit)),),
+        )
+        latest: dict[tuple[str | None, str | None], dict[str, Any]] = {}
+        order: list[tuple[str | None, str | None]] = []
+        for row in rows:
+            entry = dict(row)
+            entry["reasons"] = json.loads(entry.get("reasons") or "[]")
+            key = (entry.get("ssid"), entry.get("bssid"))
+            if key not in latest:
+                latest[key] = entry
+                order.append(key)
+        return [latest[key] for key in order]
+
     def prune(self, older_than: datetime) -> int:
         """Delete score history older than ``older_than``."""
         cursor = self._db.execute("DELETE FROM risk_scores WHERE created_at < ?", (_iso(older_than),))

@@ -19,7 +19,7 @@ from app.alerts import AlertManager, AlertTransition
 from app.core.config import Config
 from app.detection import DetectionContext, DetectionEngine, Finding
 from app.models import Alert, AlertType, NetworkObservation, ScanSession, ScanSessionStatus, utcnow
-from app.parser import parse_interfaces, parse_visible_networks_as_observations
+from app.parser import InterfaceInfo, parse_interfaces, parse_visible_networks_as_observations
 from app.scanner import NetshScanner, ScannerError
 from app.scoring import RiskAssessment, RiskScorer
 from app.storage import (
@@ -122,11 +122,18 @@ class ScanPipeline:
         self._prune_every = max(1, prune_every)
         self._known_bssids: frozenset[str] | None = None
         self._scan_counter = 0
+        self.last_interface: InterfaceInfo | None = None
+        self.last_error: str | None = None
 
     @property
     def engine(self) -> DetectionEngine:
         """Detection engine in use (shared state survives across scans)."""
         return self._engine
+
+    @property
+    def known_bssids_count(self) -> int:
+        """Size of the loaded BSSID history."""
+        return len(self.known_bssids)
 
     @property
     def known_bssids(self) -> frozenset[str]:
@@ -151,6 +158,7 @@ class ScanPipeline:
         except Exception as exc:  # pragma: no cover - defensive
             logger.exception("unexpected scan failure")
             report = self._fail(session, started, f"unexpected error: {exc}")
+        self.last_error = None if report.ok else report.error
         logger.info("%s", report.summary())
         return report
 
@@ -236,6 +244,7 @@ class ScanPipeline:
 
     def _connection_state(self) -> tuple[str | None, int | None]:
         """Best-effort lookup of the adapter's own connection."""
+        self.last_interface = None
         try:
             result = self._scanner.show_interfaces()
             if not result.ok:
@@ -245,7 +254,10 @@ class ScanPipeline:
             return None, None
         for info in interfaces:
             if info.is_connected and info.bssid:
+                self.last_interface = info
                 return info.bssid, info.signal
+        if interfaces:
+            self.last_interface = interfaces[0]
         return None, None
 
     def _maybe_prune(self) -> None:
@@ -316,6 +328,26 @@ class MonitoringService:
     def interval_seconds(self) -> int:
         """Configured delay between scans."""
         return self._interval
+
+    @property
+    def on_report(self) -> Callable[[ScanReport], None] | None:
+        """Current report callback."""
+        return self._on_report
+
+    @property
+    def on_error(self) -> Callable[[str], None] | None:
+        """Current error callback."""
+        return self._on_error
+
+    def set_callbacks(
+        self,
+        *,
+        on_report: Callable[[ScanReport], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
+    ) -> None:
+        """Replace the callbacks (safe while the loop is running)."""
+        self._on_report = on_report
+        self._on_error = on_error
 
     @property
     def pipeline(self) -> ScanPipeline:

@@ -134,10 +134,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return EXIT_GUI_UNAVAILABLE
 
+    from app.core.context import AppContext
+    from app.storage import StorageError
+
     try:
-        return run_app(config)
+        context = AppContext(config_path=args.config, config=config)
+    except StorageError as exc:
+        logger.error("Local storage could not be opened: %s", exc)
+        return EXIT_FAILURE
+    except OSError as exc:
+        logger.error("Application directories could not be prepared: %s", exc)
+        return EXIT_FAILURE
+
+    try:
+        return run_app(context)
     except Exception:
         logger.exception("Unhandled error while running the graphical interface")
+        context.close()
         return EXIT_FAILURE
 
 
