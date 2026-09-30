@@ -128,25 +128,38 @@ class AppContext:
         """Re-point the running services at a new configuration."""
         previous = self.config
         self.config = config
-        self.engine = self.engine.with_config(config)
-        self.scorer = RiskScorer(config)
         self.alert_manager = AlertManager(
             self.alerts,
             config=config,
             notifier=self.alert_manager.notifier,
             notify_below_severity=self.alert_manager.notify_below_severity,
         )
-        if self.monitoring.is_running and previous.scan_interval_seconds != config.scan_interval_seconds:
-            logger.info("scan interval changed from %ss to %ss; restarting loop",
-                        previous.scan_interval_seconds, config.scan_interval_seconds)
-            self.monitoring.stop()
+        # The pipeline keeps its own references: push the new configuration
+        # into it, otherwise weights, thresholds and retention would keep the
+        # values captured at construction time until the app restarts.
+        self.pipeline.apply_config(config, alert_manager=self.alert_manager)
+        self.engine = self.pipeline.engine
+        self.scorer = self.pipeline.scorer
+
+        if previous.scan_interval_seconds != config.scan_interval_seconds:
+            logger.info(
+                "scan interval changed from %ss to %ss",
+                previous.scan_interval_seconds,
+                config.scan_interval_seconds,
+            )
+            was_running = self.monitoring.is_running
+            on_report = self.monitoring.on_report
+            on_error = self.monitoring.on_error
+            if was_running:
+                self.monitoring.stop()
             self.monitoring = MonitoringService(
                 self.pipeline,
                 interval_seconds=config.scan_interval_seconds,
-                on_report=self.monitoring.on_report,
-                on_error=self.monitoring.on_error,
+                on_report=on_report,
+                on_error=on_error,
             )
-            self.monitoring.start()
+            if was_running:
+                self.monitoring.start()
 
     def set_callbacks(
         self,

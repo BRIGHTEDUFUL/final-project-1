@@ -131,6 +131,34 @@ class ScanPipeline:
         return self._engine
 
     @property
+    def scorer(self) -> RiskScorer:
+        """Risk scorer in use."""
+        return self._scorer
+
+    @property
+    def config(self) -> Config:
+        """Configuration currently driving detection, scoring and retention."""
+        return self._config
+
+    def apply_config(
+        self,
+        config: Config,
+        *,
+        alert_manager: AlertManager | None = None,
+    ) -> None:
+        """Re-point the running pipeline at a new configuration.
+
+        Weights, thresholds and the retention window take effect on the next
+        scan. The engine keeps its learned persistence counters so a settings
+        change never erases what monitoring has already observed.
+        """
+        self._config = config
+        self._engine = self._engine.with_config(config)
+        self._scorer = RiskScorer(config)
+        if alert_manager is not None:
+            self._alert_manager = alert_manager
+
+    @property
     def known_bssids_count(self) -> int:
         """Size of the loaded BSSID history."""
         return len(self.known_bssids)
