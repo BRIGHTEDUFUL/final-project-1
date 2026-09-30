@@ -53,10 +53,12 @@ def _write_csv(path: Path, columns: Sequence[str], rows: Iterable[dict[str, obje
     if path.exists() and not path.is_file():
         raise ExportError(f"{path} is not a file")
 
-    path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     written = 0
     try:
+        # Directory creation can fail too (read-only parent, parent is a file),
+        # so it must stay inside the guarded block.
+        path.parent.mkdir(parents=True, exist_ok=True)
         with temporary.open("w", encoding="utf-8-sig", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=list(columns), extrasaction="ignore")
             writer.writeheader()
@@ -65,7 +67,10 @@ def _write_csv(path: Path, columns: Sequence[str], rows: Iterable[dict[str, obje
                 written += 1
         temporary.replace(path)
     except OSError as exc:
-        temporary.unlink(missing_ok=True)
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:  # pragma: no cover - cleanup is best effort
+            logger.debug("could not remove partial export %s", temporary)
         raise ExportError(f"cannot write {path}: {exc}") from exc
 
     logger.info("exported %d rows to %s", written, path)
