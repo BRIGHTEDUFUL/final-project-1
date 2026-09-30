@@ -207,6 +207,16 @@ class ObservationRepository:
         row = self._db.query_one("SELECT COUNT(*) AS n FROM observations")
         return int(row["n"]) if row else 0
 
+    def known_bssids(self) -> frozenset[str]:
+        """Every BSSID recorded so far (used by the new-access-point rule)."""
+        rows = self._db.query("SELECT DISTINCT bssid FROM observations WHERE bssid IS NOT NULL")
+        return frozenset(str(row["bssid"]) for row in rows if row["bssid"])
+
+    def known_ssids(self) -> frozenset[str]:
+        """Every network name recorded so far."""
+        rows = self._db.query("SELECT DISTINCT ssid FROM observations WHERE ssid IS NOT NULL")
+        return frozenset(str(row["ssid"]) for row in rows if row["ssid"])
+
     def prune(self, older_than: datetime) -> int:
         """Delete observations older than ``older_than``; return rows removed."""
         cursor = self._db.execute("DELETE FROM observations WHERE observed_at < ?", (_iso(older_than),))
