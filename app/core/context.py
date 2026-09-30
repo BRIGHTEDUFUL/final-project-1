@@ -13,6 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app.alerts import AlertManager, CompositeNotifier, LogNotifier, Notifier, WindowsToastNotifier
+from app.capture import FrameObserver
 from app.core import paths
 from app.core.config import Config, ConfigError, load_config, save_config
 from app.detection import DetectionEngine
@@ -61,6 +62,7 @@ class AppContext:
         notifier: Notifier | None = None,
         scanner: NetshScanner | None = None,
         config: Config | None = None,
+        frame_observer: FrameObserver | None = None,
     ) -> None:
         self.config_path = config_path or paths.config_path()
         self.config = config or self._load_config()
@@ -90,6 +92,9 @@ class AppContext:
         )
 
         self.scanner = scanner or NetshScanner()
+        self.frame_observer = frame_observer or FrameObserver(
+            enabled=self.config.frame_observer_enabled
+        )
         self.pipeline = ScanPipeline(
             scanner=self.scanner,
             observations=self.observations,
@@ -101,11 +106,16 @@ class AppContext:
             config=self.config,
             engine=self.engine,
             scorer=self.scorer,
+            frame_observer=self.frame_observer,
         )
         self.monitoring = MonitoringService(
             self.pipeline,
             interval_seconds=self.config.scan_interval_seconds,
         )
+        # Passive frame capture is independent of the scan cadence: it runs
+        # whenever it is enabled and the driver prerequisites are met, and
+        # degrades to a recorded status when they are not.
+        self.frame_observer.start()
         logger.debug("application context built (config=%s, db=%s)", self.config_path, self.database.path)
 
     # ------------------------------------------------------------- lifecycle
@@ -158,6 +168,9 @@ class AppContext:
             if was_running:
                 self.monitoring.start()
 
+        if previous.frame_observer_enabled != config.frame_observer_enabled:
+            self.frame_observer.set_enabled(config.frame_observer_enabled)
+
     def set_callbacks(
         self,
         on_report: Callable[[ScanReport], None] | None = None,
@@ -172,6 +185,10 @@ class AppContext:
             self.monitoring.stop(timeout=10)
         except Exception:  # pragma: no cover - defensive
             logger.exception("monitoring did not stop cleanly")
+        try:
+            self.frame_observer.stop()
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("frame observer did not stop cleanly")
         try:
             self.database.close()
         except Exception:  # pragma: no cover - defensive

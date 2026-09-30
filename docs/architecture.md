@@ -23,6 +23,7 @@ repository (`app/`), not a target design.
 | Storage | `app/storage/` | `Database` (thread-safe SQLite handle), versioned schema, parameterised repositories. |
 | Alerts | `app/alerts/manager.py`, `notifiers.py` | `AlertManager` (create/dedup/escalate/acknowledge/resolve/notify), `Notifier` chain: Windows toast → log. |
 | Services | `app/services/` | `ScanPipeline` (one synchronous pass), `MonitoringService` (background loop), `views.py` (live-network snapshots), `export.py` (atomic CSV). |
+| Frame observer | `app/capture/` | Optional passive beacon analysis: `beacons.py` (pure radiotap/802.11 parser), `source.py` (ctypes binding to the system `wpcap.dll`, BPF management-frame filter), `observer.py` (session index + evidence lines). Degrades to "unavailable" without the Npcap driver. |
 | UI | `app/ui/` | `shell.MainWindow` (sidebar, routing, monitoring controls), `bridge.MonitorBridge` (thread → GUI signals), `pages/` (Dashboard, Live networks, Investigation, Alerts, Trusted networks, History, Settings, About), `theme.py`, `widgets.py`, `table_models.py`. |
 
 ---
@@ -158,6 +159,12 @@ MonitoringService._loop()
 - **Bridge signals:** `report_ready(object)`, `error_raised(str)`,
   `monitoring_changed(bool)`, `alert_count_changed(int)` (emitted from
   `emit_report` for successful reports).
+- **Frame observer thread** (`rogue-ap-frames`, optional): a second daemon
+  thread exists only while frame capture is enabled *and* the Npcap driver
+  is present (see §7). It calls `pcap_next_ex` with a 500 ms read timeout,
+  so `stop()` returns within roughly a second even on an idle network. The
+  thread never touches SQLite; it only fills an in-memory BSSID index that
+  the pipeline reads (with a lock) when an alert is written.
 
 ---
 
@@ -259,3 +266,50 @@ Defined in `app/main.py`:
 
 A Qt event-loop exit code is propagated as-is when the window closes normally
 (`run_app` returns `application.exec()`'s value, `0` for a normal close).
+
+---
+
+## 7. Passive frame observer (optional)
+
+`app/capture/` is an additive evidence layer below netsh. It is the only
+part of the application that touches a capture driver, and it is built to
+be absent: without the free Npcap driver every code path degrades to a
+recorded status message while scanning continues exactly as before.
+
+```
+ Npcap driver (system, not bundled)
+        │ wpcap.dll via ctypes — no third-party Python packages
+        ▼
+ FrameSource  ── pcap_findalldevs → registry GUID → "Wi-Fi" friendly name
+        │       pcap_open_live (snaplen 65535, 500 ms timeout)
+        │       BPF "type mgt subtype beacon-probe-resp" (best effort)
+        │       thread "rogue-ap-frames": pcap_next_ex loop
+        ▼ raw link-layer bytes
+ parse_frame()  ── pure parser: radiotap/PPI skip → mgmt header → IEs
+        │           SSID / DS channel / RSN(AKM, MFPC/MFPR) / WPA1 / WPS
+        ▼ BeaconInfo (bssid, hidden, wps, pmf, sae, wep_era, ...)
+ FrameObserver  ── in-memory dict[bssid] → FrameRecord (first/last, count)
+        │           evidence lines, max 4 per alert
+        ▼
+ ScanPipeline._enriched_reasons()  ── appended AFTER scoring
+```
+
+Design guarantees:
+
+1. **Passive only.** The source calls no `pcap_sendpacket`-style function;
+   the parser interprets only the two management subtypes an AP broadcasts
+   in the clear. Data frames, client addresses and encrypted payloads are
+   never read into the index.
+2. **Score integrity.** Evidence lines are appended to `reasons` after the
+   score is computed; risk weights remain the only score input
+   (regression-tested in `tests/integration/test_monitoring.py`).
+3. **No new dependencies, no licence contagion.** The driver is referenced
+   from the operating system; nothing is vendored, pip-installed or
+   bundled, so the MIT licence and the offline-first build are unchanged.
+4. **Graceful degradation.** `check_availability()` distinguishes
+   *unavailable* (driver missing, non-Windows) from *error* (driver present
+   but the adapter refused capture). Both appear in Settings →
+   “Passive frame observer” status; neither raises into the UI.
+5. **Configurable.** `frame_observer_enabled` (default `true`) is toggled
+   live through Settings; `AppContext.apply_config()` starts or stops the
+   capture thread without restarting the application.

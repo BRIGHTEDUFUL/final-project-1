@@ -184,3 +184,60 @@ def test_new_monitoring_service_defaults_match_context(tmp_path: Path, load_fixt
         assert fresh.interval_seconds == context.monitoring.interval_seconds
     finally:
         context.close()
+
+
+# ------------------------------------------------------------- frame observer
+
+
+def test_save_config_toggles_frame_observer(tmp_path: Path, load_fixture) -> None:
+    """The settings switch starts and stops frame capture at runtime."""
+    from app.capture import CaptureAvailability, FrameObserver, ObserverState
+    from tests.support import FakeFrameSource
+
+    scanner = FakeScanner(
+        network_text=load_fixture(NETWORKS_FIXTURE),
+        interface_text=load_fixture(INTERFACES_FIXTURE),
+    )
+    source = FakeFrameSource()
+    observer = FrameObserver(
+        enabled=True,
+        source=source,
+        availability=lambda: CaptureAvailability(True),
+    )
+    context = AppContext(
+        config_path=tmp_path / "config.json",
+        config=Config(),
+        notifier=NullNotifier(),
+        scanner=scanner,  # type: ignore[arg-type]
+        frame_observer=observer,
+    )
+    try:
+        assert observer.state is ObserverState.RUNNING
+        assert source.callback is not None
+
+        context.save_config(replace(context.config, frame_observer_enabled=False))
+        assert observer.state is ObserverState.DISABLED
+        assert source.stopped is True
+
+        context.save_config(replace(context.config, frame_observer_enabled=True))
+        assert observer.state is ObserverState.RUNNING
+        assert source.callback is not None, "capture must resume when re-enabled"
+    finally:
+        context.close()
+
+    assert source.stopped is True, "close() must stop frame capture"
+
+
+def test_default_context_survives_unavailable_frame_driver(tmp_path: Path, load_fixture) -> None:
+    """A machine without Npcap builds a context that still works fully."""
+    context = _context(tmp_path, load_fixture)
+    try:
+        from app.capture import ObserverState
+
+        assert context.frame_observer.state in {
+            ObserverState.UNAVAILABLE,
+            ObserverState.RUNNING,
+        }
+        assert context.monitoring.scan_once().ok, "netsh scanning must be unaffected"
+    finally:
+        context.close()

@@ -34,6 +34,10 @@ BODY = f"""
 It observes the wireless environment through the operating system's own scan
 command, compares what it sees against a baseline <i>you</i> approve, and
 explains every score it produces.</p>
+<p>Optionally, when the free Npcap driver is installed, it also reads broadcast
+beacon frames for extra evidence (WPS, 802.11w, hidden SSID, SAE). That layer
+is passive too: management frames only, no payloads, no transmission, no
+effect on risk scores.</p>
 
 <p style="color:#e0a63a;"><b>What it does not do</b></p>
 <ul>

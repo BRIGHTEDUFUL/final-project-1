@@ -8,6 +8,7 @@
 | Python 3.11+ | 3.14 is the version used during development |
 | Git | Version control |
 | Wireless adapter | Required for scanning phases (Phase 1+); **not** required to run the tests |
+| Npcap driver *(optional)* | Free installer from npcap.com; enables the passive beacon-frame observer. Not bundled, not required — without it the app reports `unavailable — Npcap/WinPcap driver not found` in Settings and stays fully netsh-only. Tests skip the live capture check. |
 
 ## 2. Install
 

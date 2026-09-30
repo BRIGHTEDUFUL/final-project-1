@@ -13,7 +13,7 @@ does — no external certifications or audits are implied.
 ## 1. Defensive scope
 
 Rogue AP Hunter is a **passive, read-only** Wi-Fi monitoring tool for Windows.
-Its only data source is the output of two built-in Windows commands:
+Its primary data source is the output of two built-in Windows commands:
 
 | Command | Purpose |
 |---------|---------|
@@ -24,17 +24,35 @@ Both are display-only commands (see `app/scanner/netsh.py`, `NETWORKS_COMMAND`
 and `INTERFACES_COMMAND`). The adapter never invokes any other command, never
 modifies network configuration and never connects to a network.
 
+An **optional second source** exists: the passive frame observer
+(`app/capture/`, reviewed below) reads broadcast beacon frames through an
+already-installed Npcap driver. It is disabled by removing the driver or the
+`frame_observer_enabled` setting, and the tool then reduces to the two
+`netsh` commands only.
+
 ### What the tool explicitly does not do
 
 | Capability | Status | Where this is enforced |
 |------------|--------|------------------------|
 | Credential collection, capture or storage | **Not implemented** | No code path reads keys, passwords, handshakes or authentication frames. The scanner only parses the text of the two `netsh` display commands. |
-| Packet capture (pcap/monitor mode) | **Not implemented** | `app/scanner/` invokes `netsh` only; no capture library is a dependency (`pyproject.toml`: `PySide6`, `matplotlib`). |
-| Traffic interception, decryption, man-in-the-middle | **Not implemented** | Nothing in the process touches another device's traffic. |
+| Packet capture of network traffic (payload pcap, monitor mode, channel hopping) | **Not implemented** | `app/scanner/` invokes `netsh` only; no capture library is a dependency (`pyproject.toml`: `PySide6`, `matplotlib`). The frame observer (§1) reads broadcast *management* frames only — never payload traffic — and cannot change channels. |
+| Traffic interception, decryption, man-in-the-middle | **Not implemented** | Nothing in the process touches another device's traffic; frame parsing never decrypts anything. |
 | Auto-connect to observed networks | **Not implemented** | `netsh` is only ever called with `show` subcommands; there is no connect/disconnect code. |
-| Jamming, deauthentication, packet injection, AP mode | **Not implemented** | Requires monitor-mode drivers/injection tooling, none of which is used or depended on. |
+| Jamming, deauthentication, packet injection, AP mode | **Not implemented** | Requires monitor-mode drivers/injection tooling, none of which is used or depended on; `app/capture/` binds no transmit function. |
 | Cloud services, paid APIs, telemetry | **Not implemented** | No network client exists in `app/`; all output is local (log file, SQLite, CSV export, optional Windows toast). |
-| Elevating privileges | **Not required** | Scanning via `netsh wlan show` works for a standard user on a machine with WLAN support. |
+| Elevating privileges | **Not required** | Scanning via `netsh wlan show` works for a standard user on a machine with WLAN support. Frame observation may need an elevated session depending on Npcap configuration; refusal is reported, not retried. |
+
+### Passive frame observer review (`app/capture/`)
+
+| Checkpoint | Finding |
+|------------|---------|
+| What is read | Broadcast **beacon** and **probe-response** frames only: BSSID, SSID (including the hidden case), channel, capability bits and information elements (RSN/WPA1/WPS/DS). Enforced twice: a BPF filter (`type mgt subtype beacon-probe-resp`) where the link type supports it, and `parse_frame()` rejecting every other frame type in-process. |
+| What is never read | Data/payload frames, client (STA) addresses, encrypted material. Probe *requests* (which carry client MACs) are excluded by the filter and by the parser. |
+| Transmission | None. The ctypes binding exposes no send/inject function and the code calls none. |
+| Storage | The beacon index is **in-memory for the session only**; it is never written to SQLite, exports or logs. Evidence lines (`beacon: …`) may appear inside an alert's `reasons` like any other reason, capped at four per alert. |
+| Driver | References the system-installed `wpcap.dll` (Npcap/WinPcap). The driver is **not bundled or redistributed**; absence is a normal, reported state. DLL lookup uses the OS system directory plus the standard search — no network fetch, no extraction to disk. |
+| Score integrity | Evidence is appended after scoring; risk weights remain the only score input (regression test: `tests/integration/test_monitoring.py`). |
+| Failure modes | Missing driver / non-Windows → state `unavailable` with the reason; adapter or permission refusal → state `error` with the driver's message. Both surface in Settings and never raise into the UI. |
 
 The same statement is repeated to the user on the in-application **About**
 screen (`app/ui/pages/about.py`), so operators see the scope at runtime.
@@ -212,6 +230,8 @@ diagnostics (see `docs/troubleshooting.md`).
 - **What is stored locally:** observations (SSID/BSSID/signal/security/
   channel/timestamps), scan sessions, trusted-network profiles you enter,
   alerts with their reasons and scores, risk-score history, and `config.json`.
+  Beacon-frame data (when the optional observer runs) stays in memory for
+  the session and is discarded on exit.
 - **Who can read it:** anything running as your user account. The data
   directory inherits normal per-user filesystem permissions.
 - **How to erase it:** delete the application home directory, or set
@@ -243,11 +263,14 @@ diagnostics (see `docs/troubleshooting.md`).
 Stated plainly so nobody mistakes this tool for a complete security product:
 
 - **Heuristic detection.** Rules describe observable patterns only; there is
-  no cryptographic validation of an access point, no 802.11 management-frame
-  analysis and no WIPS functionality.
+  no cryptographic validation of an access point and no WIPS functionality.
+  When the optional frame observer is active it adds beacon-level facts
+  (WPS, 802.11w, hidden SSID, SAE) but still performs no active probing.
 - **Data source limits.** Detection quality depends on what the local adapter
   reports through `netsh` (scan cadence, band support, driver behaviour).
-  Hidden SSIDs and partially reported BSSIDs reduce visibility.
+  Hidden SSIDs and partially reported BSSIDs reduce visibility. The frame
+  observer can only see frames on the channel the adapter currently uses —
+  it does not hop channels (stock Windows drivers do not allow it).
 - **Single-user, single-machine.** No multi-tenant access control, no
   encryption at rest beyond what the filesystem provides, no authentication.
 - **No update mechanism.** The application does not check for or install

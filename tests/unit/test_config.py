@@ -98,3 +98,28 @@ def test_with_overrides_returns_validated_copy() -> None:
     assert Config().scan_interval_seconds == 15
     with pytest.raises(ConfigError):
         Config().with_overrides(scan_interval_seconds=1)
+
+
+# ------------------------------------------------------- frame observer option
+
+
+def test_frame_observer_enabled_defaults_on() -> None:
+    assert Config().frame_observer_enabled is True
+
+
+def test_frame_observer_flag_must_be_boolean() -> None:
+    with pytest.raises(ConfigError):
+        Config(frame_observer_enabled="yes").validate()  # type: ignore[arg-type]
+
+
+def test_frame_observer_flag_roundtrips(tmp_path: Path) -> None:
+    target = tmp_path / "config.json"
+    original = Config(frame_observer_enabled=False)
+
+    save_config(original, target)
+
+    assert load_config(target).frame_observer_enabled is False
+
+
+def test_frame_observer_flag_toggles_via_overrides() -> None:
+    assert Config().with_overrides(frame_observer_enabled=False).frame_observer_enabled is False

@@ -26,6 +26,12 @@ approve, and explains every risk score it produces.
   to a finding.
 - Stores everything **locally** in SQLite (observations, sessions, alerts,
   scores, profiles) with a configurable retention window.
+- Optionally adds **passive beacon-frame evidence**: when the free Npcap
+  driver is installed, a background observer reads only broadcast
+  beacon/probe-response frames (system `wpcap.dll` via ctypes — no extra
+  Python packages) and appends observable facts such as *WPS advertised*,
+  *802.11w absent*, *hidden SSID* or *SAE advertised* to matching alerts.
+  Evidence only — it never changes a risk score.
 - Raises **Windows toast notifications** (with a log fallback) and provides a
   full alert workflow: acknowledge → resolve → reopen, plus CSV export.
 - Ships a Qt/PySide6 desktop interface with eight screens, background
@@ -37,10 +43,16 @@ approve, and explains every risk score it produces.
 | Not implemented | |
 |-----------------|---|
 | Credential capture, interception or decryption | ✗ |
-| Packet capture / monitor mode | ✗ |
+| Packet capture of network traffic, monitor mode, channel hopping | ✗ |
 | Auto-connect to observed networks | ✗ |
 | Jamming, deauthentication, packet injection | ✗ |
 | Cloud services, paid APIs, telemetry | ✗ |
+
+The frame observer mentioned above is deliberately narrower than "packet
+capture": it reads only the broadcast management frames an access point
+sends in the clear (beacon / probe response — the same class of data `netsh`
+reports, plus its information elements). No payload traffic, no client
+station addresses, no decryption, no transmission.
 
 Details and the security review: [`SECURITY.md`](SECURITY.md).
 
@@ -57,7 +69,8 @@ Details and the security review: [`SECURITY.md`](SECURITY.md).
   expected security.
 - **History** — past scan sessions and stored observations, CSV export.
 - **Settings** — scan interval, retention, severity thresholds, risk weights,
-  log level, notifications — validated before saving.
+  log level, notifications, passive frame observer (with live status) —
+  validated before saving.
 - **About** — scope, limitations, licence and data locations.
 
 How to read scores and severities:
@@ -71,6 +84,7 @@ Screen-by-screen guide: [`docs/user-manual.md`](docs/user-manual.md).
 | Operating system | Windows 10 / 11 (the scanner is `netsh wlan`-based) |
 | Python | 3.11+ for development (3.14 used here); packaged builds bundle it |
 | Hardware | A wireless adapter with working WLAN support — only needed to *scan*, not to build or test |
+| Optional | [Npcap](https://npcap.com) driver for passive beacon-frame evidence; without it the app stays fully netsh-only |
 | Network | None — no internet access is required after installation |
 
 ## Quick start (development)
@@ -110,7 +124,8 @@ pytest tests/unit         # fast unit tests only
 .\scripts\dev-check.ps1   # lint + tests in one step (the pre-commit gate)
 ```
 
-- The suite currently reports **319 tests, all passing** (measured with
+- The suite currently reports **386 tests passing, 1 environment-skipped**
+  (the live frame-capture check skips when Npcap is absent; measured with
   `.\.venv\Scripts\pytest.exe`); see
   [`docs/testing-report.md`](docs/testing-report.md) for the breakdown.
 - **Tests never require live Wi-Fi**: scanners are injected, parser input

@@ -59,6 +59,7 @@ class Config:
     high_threshold: int = 60
     critical_threshold: int = 80
     notifications_enabled: bool = True
+    frame_observer_enabled: bool = True
     data_retention_days: int = 90
     log_level: str = "INFO"
     risk_weights: RiskWeights = field(default_factory=RiskWeights)
@@ -91,6 +92,11 @@ class Config:
 
         if not isinstance(self.notifications_enabled, bool):
             raise ConfigError(f"notifications_enabled must be a boolean, got {self.notifications_enabled!r}")
+
+        if not isinstance(self.frame_observer_enabled, bool):
+            raise ConfigError(
+                f"frame_observer_enabled must be a boolean, got {self.frame_observer_enabled!r}"
+            )
 
         if self.log_level not in VALID_LOG_LEVELS:
             raise ConfigError(f"log_level must be one of {VALID_LOG_LEVELS}, got {self.log_level!r}")

@@ -16,6 +16,7 @@ from datetime import timedelta
 from time import perf_counter
 
 from app.alerts import AlertManager, AlertTransition
+from app.capture import FrameObserver
 from app.core.config import Config
 from app.detection import DetectionContext, DetectionEngine, Finding
 from app.models import Alert, AlertType, NetworkObservation, ScanSession, ScanSessionStatus, utcnow
@@ -107,6 +108,7 @@ class ScanPipeline:
         config: Config | None = None,
         engine: DetectionEngine | None = None,
         scorer: RiskScorer | None = None,
+        frame_observer: FrameObserver | None = None,
         prune_every: int = DEFAULT_PRUNE_EVERY_SCANS,
     ) -> None:
         self._scanner = scanner
@@ -119,6 +121,7 @@ class ScanPipeline:
         self._config = config or Config()
         self._engine = engine or DetectionEngine(self._config)
         self._scorer = scorer or RiskScorer(self._config)
+        self._frame_observer = frame_observer
         self._prune_every = max(1, prune_every)
         self._known_bssids: frozenset[str] | None = None
         self._scan_counter = 0
@@ -254,12 +257,15 @@ class ScanPipeline:
         for assessment in assessments:
             if assessment.score <= 0:
                 continue
+            # Evidence may be enriched with observed beacon facts; the score
+            # itself stays the pure product of the configured risk weights.
+            reasons = self._enriched_reasons(assessment.bssid, assessment.reasons)
             self._scores.add(
                 ssid=assessment.ssid,
                 bssid=assessment.bssid,
                 score=assessment.score,
                 severity=assessment.severity,
-                reasons=assessment.reasons,
+                reasons=reasons,
                 created_at=assessment.evaluated_at,
             )
             alert = Alert.from_score(
@@ -267,7 +273,7 @@ class ScanPipeline:
                 bssid=assessment.bssid,
                 alert_type=_alert_type_for(assessment),
                 risk_score=assessment.score,
-                reasons=assessment.reasons,
+                reasons=reasons,
                 thresholds=self._scorer.thresholds(),
                 created_at=assessment.evaluated_at,
             )
@@ -303,6 +309,15 @@ class ScanPipeline:
         if interfaces:
             self.last_interface = interfaces[0]
         return None, None
+
+    def _enriched_reasons(self, bssid: str | None, reasons: tuple[str, ...]) -> tuple[str, ...]:
+        """Append beacon-derived evidence lines without touching the score."""
+        if self._frame_observer is None or bssid is None:
+            return reasons
+        extra = self._frame_observer.enrich(bssid)
+        if not extra:
+            return reasons
+        return tuple(dict.fromkeys([*reasons, *extra]))
 
     def _maybe_prune(self) -> None:
         """Apply the retention window periodically, not on every scan."""

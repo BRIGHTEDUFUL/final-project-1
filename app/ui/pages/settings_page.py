@@ -130,6 +130,27 @@ class SettingsPage(Page):
         notify_form.addRow(notify_hint)
         self.body.addWidget(notify_box)
 
+        # ---- frame observer --------------------------------------------
+        frame_box = QGroupBox("Passive frame observer")
+        frame_form = QFormLayout(frame_box)
+        self._frame_enabled = QCheckBox(
+            "Analyze beacon frames for extra evidence (requires the Npcap driver)"
+        )
+        frame_form.addRow(self._frame_enabled)
+        self._frame_status = QLabel("")
+        self._frame_status.setObjectName("hint")
+        self._frame_status.setWordWrap(True)
+        frame_form.addRow("Status", self._frame_status)
+        frame_note = QLabel(
+            "Reads only broadcast beacon and probe-response frames on this machine. "
+            "No transmission, no decryption, no client tracking. Without the free "
+            "Npcap driver the application stays netsh-only."
+        )
+        frame_note.setWordWrap(True)
+        frame_note.setObjectName("hint")
+        frame_form.addRow(frame_note)
+        self.body.addWidget(frame_box)
+
         # ---- actions ----------------------------------------------------
         actions = QHBoxLayout()
         self._save_button = QPushButton("Save settings")
@@ -147,8 +168,8 @@ class SettingsPage(Page):
         self.body.addLayout(actions)
         self.body.addStretch(1)
 
-        # Five group boxes plus the action row never fit a short window:
-        # make the whole form reachable by scrolling instead of clipping.
+        # The form exceeds a short window: make it reachable by scrolling
+        # instead of clipping.
         self.make_scrollable()
 
         self.refresh()
@@ -165,6 +186,8 @@ class SettingsPage(Page):
         self._high.setValue(config.high_threshold)
         self._critical.setValue(config.critical_threshold)
         self._notifications.setChecked(config.notifications_enabled)
+        self._frame_enabled.setChecked(config.frame_observer_enabled)
+        self._frame_status.setText(self._context.frame_observer.status_text())
         for field_name, spin in self._weight_spins.items():
             spin.setValue(getattr(config.risk_weights, field_name))
 
@@ -176,6 +199,7 @@ class SettingsPage(Page):
             high_threshold=self._high.value(),
             critical_threshold=self._critical.value(),
             notifications_enabled=self._notifications.isChecked(),
+            frame_observer_enabled=self._frame_enabled.isChecked(),
             data_retention_days=self._retention.value(),
             log_level=self._log_level.currentText(),
             risk_weights=RiskWeights(
@@ -199,5 +223,8 @@ class SettingsPage(Page):
             QMessageBox.critical(self, "Save failed", str(exc))
             return
         self._path_label.setText(str(saved_path))
+        # Reflect any live-state change (e.g. the frame observer starting)
+        # that the save just triggered.
+        self._frame_status.setText(self._context.frame_observer.status_text())
         self.window().statusBar().showMessage(f"Settings saved to {saved_path}", 6000)  # type: ignore[union-attr]
         self.saved.emit()

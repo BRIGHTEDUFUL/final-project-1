@@ -246,11 +246,24 @@ being edited is shown at the bottom of the page.
 | Severity thresholds | Suspicious ≥, High ≥, Critical ≥ | 1–100 each; must satisfy `0 < suspicious < high < critical ≤ 100` (defaults 30 / 60 / 80). "Low" is anything below the Suspicious threshold. |
 | Risk weights | Duplicate SSID, Unknown BSSID, Security downgrade, New access point, Suspicious signal, Persistence | 0–100 each, step 5 (defaults 25 / 20 / 30 / 10 / 5 / 10). Each distinct rule contributes its weight **once** per identity, clamped to a 0–100 total. |
 | Notifications | "Show Windows toast notifications for new alerts" | Stored as `notifications_enabled` in `config.json`. See the note below. |
+| Passive frame observer | "Analyze beacon frames for extra evidence (requires the Npcap driver)" | Stored as `frame_observer_enabled` (default on). Status line shows `running — N BSSIDs observed in beacons`, `unavailable — …` (driver missing), `error — …` (adapter refused) or `disabled`. See the note below. |
 
 **Save settings** validates first (an invalid combination such as
 Suspicious ≥ High shows a warning and changes nothing), then writes the file
 atomically and applies it to the running services. **Reload** discards
 unsaved edits.
+
+> **About the frame observer:** it reads only broadcast beacon and
+> probe-response frames — SSID, channel, capability and information
+> elements — through the system Npcap driver (install the free driver from
+> npcap.com if you want it; without it the app is netsh-only and the status
+> line says so). Facts it can attach to alerts: *WPS advertised*,
+> *802.11w management frame protection not in use/optional*, *hidden SSID*,
+> *legacy WPA1 or WEP-era security*, *SAE (WPA3) advertised* (capped at four
+> lines per alert). It never transmits, never decrypts, never records client
+> device addresses, and **never changes a risk score** — evidence lines are
+> purely additional context. Toggling the checkbox starts or stops capture
+> immediately, without restarting the application.
 
 > **Honest note on the notifications checkbox:** the flag is validated, stored
 > and reported at startup, but in the current build the notifier chain

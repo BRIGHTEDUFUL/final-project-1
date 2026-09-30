@@ -256,3 +256,71 @@ def test_alert_transitions_carry_to_the_report(env) -> None:
     active = env["manager"].active()
     assert active
     assert all(a.status is AlertStatus.ACTIVE for a in active)
+
+
+# ------------------------------------------------------- frame observer evidence
+
+
+def _enriched_pipeline(env, observer) -> ScanPipeline:
+    """A second pipeline sharing the environment's repositories."""
+    return ScanPipeline(
+        scanner=env["scanner"],  # type: ignore[arg-type]
+        observations=env["observations"],
+        sessions=env["sessions"],
+        trusted=env["trusted"],
+        scores=env["scores"],
+        alert_repository=env["alerts"],
+        alert_manager=env["manager"],
+        config=env["config"],
+        prune_every=1,
+        frame_observer=observer,
+    )
+
+
+def test_beacon_evidence_enriches_reasons_without_changing_scores(env, pipeline_env) -> None:
+    """Beacon facts are appended to evidence; scores stay weight-derived.
+
+    Both pipelines get an independent empty-history database so the
+    comparison sees the identical detection context.
+    """
+    from app.capture import CaptureAvailability, FrameObserver
+    from tests.support import MICROSOFT_OUI, FakeFrameSource, build_beacon, rsn_ie, vendor_ie
+
+    bssid = "10:20:30:40:50:60"
+    source = FakeFrameSource()
+    observer = FrameObserver(
+        enabled=True,
+        source=source,
+        availability=lambda: CaptureAvailability(True),
+    )
+    observer.start()
+    source.feed(
+        build_beacon(
+            bssid=bssid,
+            ies=(vendor_ie(MICROSOFT_OUI, 4), rsn_ie(caps=0)),  # WPS, no PMF
+        )
+    )
+
+    enriched = _enriched_pipeline(env, observer).run()
+    plain = pipeline_env["pipeline"].run()
+
+    assert plain.ok and enriched.ok
+
+    plain_scores = {a.identity: a.score for a in plain.assessments}
+    enriched_scores = {a.identity: a.score for a in enriched.assessments}
+    assert plain_scores, "fixture must produce assessments"
+    assert plain_scores == enriched_scores, "evidence must never change the score"
+
+    matching = [a for a in env["alerts"].list() if a.bssid == bssid]
+    assert matching, "the fixture BSSID must produce an alert"
+    reasons = matching[0].reasons
+    assert any(r.startswith("beacon:") for r in reasons), reasons
+    assert any("WPS" in r for r in reasons), reasons
+
+
+def test_pipeline_without_observer_keeps_plain_reasons(env) -> None:
+    report = env["pipeline"].run()
+
+    assert report.ok
+    for assessment in report.assessments:
+        assert not any(r.startswith("beacon:") for r in assessment.reasons)

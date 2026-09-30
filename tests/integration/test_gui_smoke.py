@@ -167,12 +167,15 @@ def test_settings_round_trip(window: MainWindow, context: AppContext) -> None:
     settings._interval.setValue(45)  # noqa: SLF001
     settings._suspicious.setValue(25)  # noqa: SLF001
     settings._weight_spins["persistence"].setValue(15)  # noqa: SLF001
+    settings._frame_enabled.setChecked(False)  # noqa: SLF001
+    assert settings._frame_status.text()  # noqa: SLF001  status line is populated
 
     settings._save()  # noqa: SLF001
 
     assert context.config.scan_interval_seconds == 45
     assert context.config.suspicious_threshold == 25
     assert context.config.risk_weights.persistence == 15
+    assert context.config.frame_observer_enabled is False
     assert context.config_path.exists()
 
 

@@ -33,10 +33,10 @@ pytest configuration (from `pyproject.toml`): `testpaths = ["tests"]`,
 ```
 tests/
 ├── conftest.py          load_fixture() + pipeline_env() fixtures, repo root on sys.path
-├── support.py           FakeScanner and helpers (not collected by pytest)
+├── support.py           FakeScanner, FakeFrameSource and byte-level frame builders (not collected by pytest)
 ├── fixtures/            7 sanitized netsh output samples
-├── unit/                16 files · 249 tests · ~2 s
-└── integration/          6 files · 70 tests · ~15 s
+├── unit/                19 files · 309 tests · ~2 s
+└── integration/          6 files · 78 tests (1 environment-skipped) · ~15 s
 ```
 
 ### Fixtures (`tests/fixtures/`)
@@ -56,6 +56,10 @@ fixture:
 
 `tests/support.py::FakeScanner` is a duck-typed scanner returning canned text
 (no subprocess), with knobs for unusable scans, failed exit codes and delay.
+`tests/support.py::FakeFrameSource` is the frame-observer equivalent (records
+start/stop, replays frames through the captured callback), alongside
+byte-level builders (`build_beacon`, `rsn_ie`, `vendor_ie`) that synthesise
+802.11 frames for the parser tests.
 
 `tests/conftest.py::pipeline_env` wires a complete `ScanPipeline` over a
 temporary database with a `FakeScanner` and tears it down again; integration
@@ -65,7 +69,7 @@ tests request it instead of rebuilding the object graph by hand.
 
 ## 3. Test layers
 
-### 3.1 Unit tests — `tests/unit/` (249 tests)
+### 3.1 Unit tests — `tests/unit/` (309 tests)
 
 Fast, isolated, no network, no real scanner, no Qt widgets where avoidable.
 Storage tests use `:memory:` or `tmp_path` databases.
@@ -73,6 +77,7 @@ Storage tests use `:memory:` or `tmp_path` databases.
 | File | Tests | Covers |
 |------|------:|--------|
 | `test_domain_models.py` | 35 | Trusted profiles, severity bands/clamping, alert validation/round-trip, scan sessions, settings, UTC handling |
+| `test_beacon_parser.py` | 26 | Synthetic beacon/probe-response bytes: radiotap wrapping, SSID/hidden states, RSN/AKM (PSK, SAE), 802.11w flags, WPS/WPA1 vendor IEs, WEP-era detection, truncated/garbage input never raises |
 | `test_detection_rules.py` | 24 | All five static rules: positive, negative, disabled-without-baseline, hidden SSIDs, custom weights |
 | `test_storage.py` | 24 | Schema/versioning, CRUD for every repository, dedup + occurrences, status transitions, prune, transaction rollback, SQL-injection parameterisation |
 | `test_observation.py` | 22 | Observation validation, hidden detection, immutability, datetime coercion, dict round-trip |
@@ -80,7 +85,9 @@ Storage tests use `:memory:` or `tmp_path` databases.
 | `test_bssid.py` | 20 | BSSID normalisation/rejection, list dedup, placeholder handling |
 | `test_alerts.py` | 19 | Alert lifecycle: create/dedup/escalate/cooldown, acknowledge/resolve/reopen, notifiers (null, log, composite, toast with injected runner) |
 | `test_scanner.py` | 17 | Read-only command enforcement, timeouts, missing executable, exit codes, UTF-8/ANSI decoding, availability checks (injected runner — no real `netsh`) |
-| `test_config.py` | 14 | Defaults vs documented baseline, validation ranges, corrupt/unknown-key handling, round-trip |
+| `test_config.py` | 18 | Defaults vs documented baseline, validation ranges, corrupt/unknown-key handling, round-trip, frame-observer flag |
+| `test_frame_observer.py` | 18 | Observer lifecycle (disabled/unavailable/running/error/stop), runtime toggling, evidence enrichment, cap and uniqueness, no-malice wording, records surviving restarts |
+| `test_capture_source.py` | 12 | Availability checks (Windows/driver), wireless interface selection and classification, GUID extraction from device names, start-path refusals |
 | `test_detection_engine_and_scoring.py` | 14 | Engine persistence (appear/reset/retain), scoring = distinct rules only, clamping, explainability, thresholds |
 | `test_parser_networks.py` | 11 | Real output parsing, clamping, WEP/Open labels, malformed input, security label preference |
 | `test_parser_interfaces.py` | 5 | Connected/disconnected/none parsing, malformed values |
@@ -89,16 +96,16 @@ Storage tests use `:memory:` or `tmp_path` databases.
 | `test_export.py` | 12 | CSV export: column sets, UTF-8-BOM output, quoting/escaping, atomic write + replace, `ExportError` on write failure |
 | `test_model_independence.py` | 2 | Models import no GUI/scanner/storage modules — only stdlib + `app.models` |
 
-### 3.2 Integration tests — `tests/integration/` (70 tests)
+### 3.2 Integration tests — `tests/integration/` (78 tests, 1 environment-skipped)
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `test_gui_smoke.py` | 26 | Real `MainWindow` on **Qt's offscreen platform** with a temporary `AppContext` and `FakeScanner`: window construction, navigation to every page (parametrised over `NAV_ITEMS`), unknown-page handling, scan-once updating status/pages, monitoring toggle, surfacing failed scans, investigation evidence, dashboard counts, live-network filtering and double-click investigation, alert acknowledge/resolve/reopen from the queue, alert status filters, CSV export from the alerts page, settings round-trip + invalid-threshold rejection, trusted-network dialog validation and CRUD, theme stylesheet |
-| `test_monitoring.py` | 14 | End-to-end pipeline `scan → parse → detect → score → persist → alert`: first-scan behaviour, second-scan dedup, security downgrade alerting, combined scoring, unavailable/failed/empty scans, retention pruning, service start/stop/idempotency, callback failure resilience, error reports, alert transitions in reports |
+| `test_gui_smoke.py` | 29 | Real `MainWindow` on **Qt's offscreen platform** with a temporary `AppContext` and `FakeScanner`: window construction, navigation to every page (parametrised over `NAV_ITEMS`), unknown-page handling, scan-once updating status/pages, monitoring toggle, surfacing failed scans, investigation evidence, dashboard counts, live-network filtering and double-click investigation, alert acknowledge/resolve/reopen from the queue, alert status filters, CSV export from the alerts page, settings round-trip (including the frame-observer toggle) + invalid-threshold rejection, trusted-network dialog validation and CRUD, theme stylesheet |
+| `test_monitoring.py` | 16 | End-to-end pipeline `scan → parse → detect → score → persist → alert`: first-scan behaviour, second-scan dedup, security downgrade alerting, combined scoring, unavailable/failed/empty scans, retention pruning, service start/stop/idempotency, callback failure resilience, error reports, alert transitions in reports, **beacon evidence appended without changing scores** |
 | `test_reliability.py` | 11 | Failures degrade instead of crashing: closed or unusable storage becomes an error report (and the next scan recovers), a raising scanner, failed commands, malformed and binary-junk output, history reload after a restart, rapid start/stop cycles, stop-without-start, raising callbacks |
-| `test_config_application.py` | 9 | Saved settings reaching the running services: `apply_config` re-points the pipeline and scorer, keeps alert-manager cooldown state, changes scores on the next scan, moves the retention window, and updates the monitoring interval (idle and running, callbacks preserved) |
+| `test_config_application.py` | 11 | Saved settings reaching the running services: `apply_config` re-points the pipeline and scorer, keeps alert-manager cooldown state, changes scores on the next scan, moves the retention window, updates the monitoring interval (idle and running, callbacks preserved), **toggles the frame observer live** and keeps scanning when the driver is absent |
 | `test_startup.py` | 8 | CLI entry: `--headless` exit `0`, `--version`, `--write-default-config`, explicit `--config`, corrupt config tolerance, GUI-unavailable exit code `3`, idempotent logging, invalid log level rejection |
-| `test_live_scan.py` | 2 | Real `netsh` smoke test — **skips gracefully** when WLAN is unavailable |
+| `test_live_scan.py` | 3 | Real `netsh` smoke tests plus a real frame-observer start/stop check — both **skip gracefully** when WLAN or Npcap is unavailable |
 
 ### 3.3 Offscreen GUI testing
 
@@ -120,6 +127,7 @@ describes.
 | Scanner (mocked) | `test_scanner` — injected runner asserts the exact read-only argument lists, timeouts, decoding; no real subprocess |
 | Detection rules | `test_detection_rules` |
 | Engine + scoring | `test_detection_engine_and_scoring` |
+| Frame observer (beacon parsing, evidence, capture prerequisites) | `test_beacon_parser`, `test_frame_observer`, `test_capture_source` (+ enrichment in `test_monitoring`, live start/stop in `test_live_scan`) |
 | Storage | `test_storage` |
 | Alert lifecycle & notifiers | `test_alerts` |
 | Monitoring service & pipeline | `test_monitoring`, `test_reliability` |
@@ -143,9 +151,12 @@ internet access.** Mechanisms that enforce this:
 3. **Graceful skipping.** `tests/integration/test_live_scan.py` calls the real
    scanner inside `try/except ScannerError` and calls `pytest.skip(...)` —
    never fails — when WLAN scanning is unavailable or the command exits
-   non-zero. Zero visible networks is treated as legitimate.
-4. **Offscreen Qt.** GUI tests need no interactive desktop session.
-5. **Temp isolation.** Database, config and logs go to `tmp_path`, with
+   non-zero. Zero visible networks is treated as legitimate. The frame
+   observer's live check skips the same way when the Npcap driver is absent.
+4. **Fake frame source.** All observer tests drive `FakeFrameSource` and
+   byte-synthesised frames — no capture driver is loaded by the suite.
+5. **Offscreen Qt.** GUI tests need no interactive desktop session.
+6. **Temp isolation.** Database, config and logs go to `tmp_path`, with
    `ROGUE_AP_HUNTER_HOME` redirected inside the startup tests — the suite does
    not touch your real application data.
 
@@ -166,9 +177,9 @@ pass-through adapter, and a CI runner.
 ```
 
 Reading the output: `addopts` already applies `-q`, so the summary line is the
-authoritative count (e.g. `319 passed in 17.31s`). If you see `skipped`, it
-will be the live-scan tests on a machine without WLAN — that is the designed
-behaviour, not a failure.
+authoritative count (e.g. `386 passed, 1 skipped in 17.35s`). If you see
+`skipped`, it will be the live-scan or live frame-observer tests on a machine
+without WLAN or Npcap — that is the designed behaviour, not a failure.
 
 ---
 
@@ -181,9 +192,9 @@ behaviour, not a failure.
   performance (parsing, scoring, storage, notification cooldowns) is measured
   separately by the offline harness `scripts/benchmark.py` — see
   [`performance.md`](performance.md).
-- Live-scan coverage is thin by design (2 tests) because hardware and driver
-  behaviour vary — it exists to prove the real `netsh` path works, not to
-  characterise it.
+- Live-scan coverage is thin by design (3 tests: two `netsh`, one frame
+  observer) because hardware and driver behaviour vary — it exists to prove
+  the real paths work, not to characterise them.
 - CSV export is covered at the unit level (`test_export`) and once end-to-end
   through the alerts page (`test_gui_smoke::test_alerts_csv_export_from_the_page`);
   the History-page export dialog is not driven by a test. Chart rendering is
