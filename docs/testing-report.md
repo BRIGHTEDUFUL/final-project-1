@@ -35,8 +35,8 @@ tests/
 ├── conftest.py          load_fixture() + pipeline_env() fixtures, repo root on sys.path
 ├── support.py           FakeScanner, FakeFrameSource and byte-level frame builders (not collected by pytest)
 ├── fixtures/            7 sanitized netsh output samples
-├── unit/                19 files · 309 tests · ~2 s
-└── integration/          6 files · 82 tests (1 environment-skipped) · ~15 s
+├── unit/                19 files · 310 tests · ~2 s
+└── integration/          6 files · 83 tests (1 environment-skipped) · ~15 s
 ```
 
 ### Fixtures (`tests/fixtures/`)
@@ -69,7 +69,7 @@ tests request it instead of rebuilding the object graph by hand.
 
 ## 3. Test layers
 
-### 3.1 Unit tests — `tests/unit/` (309 tests)
+### 3.1 Unit tests — `tests/unit/` (310 tests)
 
 Fast, isolated, no network, no real scanner, no Qt widgets where avoidable.
 Storage tests use `:memory:` or `tmp_path` databases.
@@ -91,16 +91,16 @@ Storage tests use `:memory:` or `tmp_path` databases.
 | `test_detection_engine_and_scoring.py` | 14 | Engine persistence (appear/reset/retain), scoring = distinct rules only, clamping, explainability, thresholds |
 | `test_parser_networks.py` | 11 | Real output parsing, clamping, WEP/Open labels, malformed input, security label preference |
 | `test_parser_interfaces.py` | 5 | Connected/disconnected/none parsing, malformed values |
-| `test_paths.py` | 5 | `ROGUE_AP_HUNTER_HOME` precedence, platform defaults, derived locations, dir creation |
+| `test_paths.py` | 6 | `ROGUE_AP_HUNTER_HOME` precedence, platform defaults, derived locations, dir creation, shipped-asset path |
 | `test_cli.py` | 4 | Argument parsing: flags, invalid log level, type errors |
 | `test_export.py` | 12 | CSV export: column sets, UTF-8-BOM output, quoting/escaping, atomic write + replace, `ExportError` on write failure |
 | `test_model_independence.py` | 2 | Models import no GUI/scanner/storage modules — only stdlib + `app.models` |
 
-### 3.2 Integration tests — `tests/integration/` (82 tests, 1 environment-skipped)
+### 3.2 Integration tests — `tests/integration/` (83 tests, 1 environment-skipped)
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `test_gui_smoke.py` | 30 | Real `MainWindow` on **Qt's offscreen platform** with a temporary `AppContext` and `FakeScanner`: window construction, navigation to every page (parametrised over `NAV_ITEMS`), unknown-page handling, async scan-once updating status/pages (event-loop wait) + busy-message refusal, monitoring toggle, surfacing failed scans, investigation evidence, dashboard counts, live-network filtering and double-click investigation, alert acknowledge/resolve/reopen from the queue, alert status filters, CSV export from the alerts page, settings round-trip (including the frame-observer toggle) + invalid-threshold rejection, trusted-network dialog validation and CRUD, theme stylesheet |
+| `test_gui_smoke.py` | 31 | Real `MainWindow` on **Qt's offscreen platform** with a temporary `AppContext` and `FakeScanner`: window construction + icon, navigation to every page (parametrised over `NAV_ITEMS`), unknown-page handling, async scan-once updating status/pages (event-loop wait) + busy-message refusal, monitoring toggle, surfacing failed scans, investigation evidence, dashboard counts, live-network filtering and double-click investigation, alert acknowledge/resolve/reopen from the queue, alert status filters, CSV export from the alerts page, settings round-trip (including the frame-observer toggle) + invalid-threshold rejection, trusted-network dialog validation and CRUD, theme stylesheet |
 | `test_monitoring.py` | 19 | End-to-end pipeline `scan → parse → detect → score → persist → alert`: first-scan behaviour, second-scan dedup, security downgrade alerting, combined scoring, unavailable/failed/empty scans, retention pruning, service start/stop/idempotency, callback failure resilience, error reports, alert transitions in reports, **beacon evidence appended without changing scores**, async one-shot scans (off-thread, overlap refusal while busy or mid-loop) |
 | `test_reliability.py` | 11 | Failures degrade instead of crashing: closed or unusable storage becomes an error report (and the next scan recovers), a raising scanner, failed commands, malformed and binary-junk output, history reload after a restart, rapid start/stop cycles, stop-without-start, raising callbacks |
 | `test_config_application.py` | 11 | Saved settings reaching the running services: `apply_config` re-points the pipeline and scorer, keeps alert-manager cooldown state, changes scores on the next scan, moves the retention window, updates the monitoring interval (idle and running, callbacks preserved), **toggles the frame observer live** and keeps scanning when the driver is absent |
@@ -177,7 +177,7 @@ pass-through adapter, and a CI runner.
 ```
 
 Reading the output: `addopts` already applies `-q`, so the summary line is the
-authoritative count (e.g. `386 passed, 1 skipped in 17.35s`). If you see
+authoritative count (e.g. `392 passed, 1 skipped in 25.97s`). If you see
 `skipped`, it will be the live-scan or live frame-observer tests on a machine
 without WLAN or Npcap — that is the designed behaviour, not a failure.
 

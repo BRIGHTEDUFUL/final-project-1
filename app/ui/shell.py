@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from PySide6.QtCore import Qt, Slot
-from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
+from PySide6.QtGui import QCloseEvent, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.core.context import AppContext
+from app.core.paths import asset_path
 from app.ui.bridge import MonitorBridge
 from app.ui.pages import (
     AboutPage,
@@ -64,6 +65,9 @@ class MainWindow(QMainWindow):
         self._nav_keys: list[str] = []
 
         self.setWindowTitle("Rogue AP Hunter")
+        icon_file = asset_path("icon.png")
+        if icon_file.is_file():
+            self.setWindowIcon(QIcon(str(icon_file)))
         self.resize(1220, 800)
         self.setMinimumSize(980, 640)
 

@@ -77,6 +77,14 @@ $exe = ".\dist\RogueAPHunter\RogueAPHunter.exe"
 `--headless` is the fastest smoke test: it creates the per-user data
 directories, writes a log file, and exits without needing a display.
 
+The executable also embeds the application icon (`assets/icon.ico`) and a
+version resource (`assets/file_version_info.txt`): right-click the exe →
+*Properties → Details* shows **Product version** matching
+`pyproject.toml`. After bumping that version, regenerate the resource with
+`.\.venv\Scripts\python.exe scripts\make_version_info.py`; regenerate the
+icon with `scripts\make_icon.py` (both are plain text/PNG assets — the
+spec picks them up unchanged).
+
 Exit codes (identical for the packaged and source builds):
 
 | Code | Meaning |
@@ -119,9 +127,11 @@ wireless environment through `netsh wlan` and writes to its own data folder.
 * Rebuild the same commit with the same dependency versions to obtain an
   equivalent bundle; record `python -m pip freeze` alongside release archives
   if bit-for-bit auditing matters.
-* The spec intentionally skips code signing, icons and version resources so
-  that no certificates or proprietary tools are required. Adding them later is
-  an optional, documented extension.
+* The spec embeds the application icon and a Windows version resource from
+  committed, self-generated assets (`assets/icon.ico`,
+  `assets/file_version_info.txt`), but intentionally skips code signing:
+  signing would require a paid certificate. Adding it later is an optional,
+  documented extension.
 
 ## CI
 

@@ -124,7 +124,7 @@ pytest tests/unit         # fast unit tests only
 .\scripts\dev-check.ps1   # lint + tests in one step (the pre-commit gate)
 ```
 
-- The suite currently reports **390 tests passing, 1 environment-skipped**
+- The suite currently reports **392 tests passing, 1 environment-skipped**
   (the live frame-capture check skips when Npcap is absent; measured with
   `.\.venv\Scripts\pytest.exe`); see
   [`docs/testing-report.md`](docs/testing-report.md) for the breakdown.
@@ -142,8 +142,10 @@ pytest tests/unit         # fast unit tests only
 
 The script runs `ruff check .` and the full test suite before invoking
 PyInstaller (installed into the virtual environment on first use), so a
-package is only produced from a passing tree. Build details, the
-`rogue-ap-hunter.spec` file and verification steps:
+package is only produced from a passing tree. The executable carries the
+application icon (`assets/icon.ico`) and a Windows version resource
+(`assets/file_version_info.txt`, kept in sync with `pyproject.toml`).
+Build details, the `rogue-ap-hunter.spec` file and verification steps:
 [`docs/packaging.md`](docs/packaging.md).
 
 ## Where your data lives
@@ -177,7 +179,7 @@ rogue-ap-hunter/
 │   └── ui/          PySide6 shell, bridge, theme, pages
 ├── tests/           unit + integration tests and sanitized fixtures
 ├── docs/            documentation set (index below)
-├── scripts/         dev-check.ps1, build.ps1, benchmark.py
+├── scripts/         dev-check.ps1, build.ps1, benchmark.py, make_icon.py
 ├── assets/          icons and artwork
 ├── rogue-ap-hunter.spec   PyInstaller build specification
 ├── SECURITY.md      security & privacy review

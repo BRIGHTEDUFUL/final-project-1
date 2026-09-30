@@ -37,3 +37,9 @@ def test_ensure_app_dirs_creates_directories(tmp_path: Path) -> None:
     assert home.is_dir()
     assert paths.log_dir(env).is_dir()
     assert paths.database_path(env).parent.is_dir()
+
+
+def test_asset_path_points_at_the_shipped_assets() -> None:
+    icon = paths.asset_path("icon.png")
+    assert icon.parent.name == "assets"
+    assert icon.is_file(), "the application icon must ship with the repository"

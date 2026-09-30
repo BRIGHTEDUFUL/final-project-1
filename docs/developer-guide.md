@@ -40,7 +40,9 @@ rogue-ap-hunter/
 ├── scripts/
 │   ├── dev-check.ps1         lint + tests (the pre-commit gate)
 │   ├── build.ps1             PyInstaller packaging (runs ruff + pytest first)
-│   └── benchmark.py          offline benchmark harness (see docs/performance.md)
+│   ├── benchmark.py          offline benchmark harness (see docs/performance.md)
+│   ├── make_icon.py          regenerate assets/icon.png + assets/icon.ico
+│   └── make_version_info.py  regenerate the EXE version resource text
 ├── docs/                     this documentation set (index in README.md)
 ├── assets/                   icons and static artwork
 ├── pyproject.toml            metadata, dependencies, pytest + ruff config
@@ -96,6 +98,7 @@ If you prefer not to activate the virtual environment, call the tools by path:
 | Lint + tests in one step | `.\scripts\dev-check.ps1` |
 | Package a Windows build | `.\scripts\build.ps1` (runs ruff + pytest, then PyInstaller) |
 | Offline benchmark | `.\.venv\Scripts\python.exe scripts\benchmark.py --iterations 20 --scans 50` |
+| Regenerate app icon / EXE version resource | `.\.venv\Scripts\python.exe scripts\make_icon.py` · `scripts\make_version_info.py` |
 
 `pyproject.toml` configures pytest (`testpaths = ["tests"]`,
 `addopts = "-q --strict-markers"`, marker `gui`) and ruff (line length 100,

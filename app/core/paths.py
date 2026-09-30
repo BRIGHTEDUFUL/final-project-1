@@ -19,6 +19,7 @@ ENV_HOME = "ROGUE_AP_HUNTER_HOME"
 __all__ = [
     "ENV_HOME",
     "app_home",
+    "asset_path",
     "config_path",
     "database_path",
     "ensure_app_dirs",
@@ -54,6 +55,16 @@ def app_home(env: Mapping[str, str] | None = None) -> Path:
 def config_path(env: Mapping[str, str] | None = None) -> Path:
     """Return the path of the JSON configuration file."""
     return app_home(env) / "config.json"
+
+
+def asset_path(name: str) -> Path:
+    """Return the path of a static asset shipped with the application.
+
+    Resolves ``assets/<name>`` relative to the ``app`` package: that is the
+    repository root in a source checkout, and the PyInstaller ``_internal``
+    directory in a frozen build, where the spec ships ``assets/``.
+    """
+    return Path(__file__).resolve().parents[2] / "assets" / name
 
 
 def log_dir(env: Mapping[str, str] | None = None) -> Path:

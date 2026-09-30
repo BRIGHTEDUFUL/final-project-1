@@ -53,7 +53,7 @@ tests listed in `docs/testing-report.md`.
 | --- | --- |
 | *Scan once* runs on the GUI thread | ✅ fixed — *Scan once* now submits `scan_once_async()` to a daemon thread; the button is disabled until the report arrives through the bridge, and overlapping submissions are refused (`test_scan_once_async_*`, `test_scan_once_shows_busy_message_*`). |
 | Notification cooldown lives in memory | resets on restart by design (never persist "do not disturb" state); worst case is one repeated toast after a restart. |
-| No code signing / no icon / no version resource | free-only constraint: no certificates or proprietary tooling. Documented with a SmartScreen workaround in `docs/packaging.md`. |
+| No code signing (icon + version resource are embedded) | free-only constraint: signing needs a paid certificate. The executable icon and version resource come from self-generated free assets (`assets/icon.ico`, `assets/file_version_info.txt`). Documented with a SmartScreen workaround in `docs/packaging.md`. |
 | English `netsh` label dependence | parser is tolerant and fixture-tested; non-English Windows is a documented limitation, not a silent failure (unknown labels degrade, they do not corrupt — see malformed fixtures). |
 | `_last_notified` / `_known_bssids` grow monotonically | bounded by the number of distinct identities observed (verified in `docs/performance.md`, 300-scan run: ~6 KiB RSS per scan). |
 | Visual/pixel regression testing absent | offscreen smoke tests assert structure and behaviour, not rendering; acceptable for a dark-themed utility UI. |

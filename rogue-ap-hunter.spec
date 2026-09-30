@@ -81,6 +81,8 @@ if ONEFILE:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
+        icon=str(ROOT / "assets" / "icon.ico"),
+        version=str(ROOT / "assets" / "file_version_info.txt"),
     )
 else:
     exe = EXE(
@@ -101,6 +103,8 @@ else:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
+        icon=str(ROOT / "assets" / "icon.ico"),
+        version=str(ROOT / "assets" / "file_version_info.txt"),
     )
     coll = COLLECT(
         exe,

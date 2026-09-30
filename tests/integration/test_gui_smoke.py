@@ -97,6 +97,10 @@ def test_window_builds_with_all_navigation_entries(window: MainWindow) -> None:
     assert len(window._pages) == len(NAV_ITEMS)  # noqa: SLF001
 
 
+def test_window_icon_is_the_shipped_mark(window: MainWindow) -> None:
+    assert not window.windowIcon().isNull(), "assets/icon.png must load as the window icon"
+
+
 @pytest.mark.parametrize("key", [key for key, _ in NAV_ITEMS])
 def test_navigation_reaches_every_page(window: MainWindow, key: str) -> None:
     window.show_page(key)
