@@ -91,6 +91,19 @@ class AlertManager:
         """Backing alert storage."""
         return self._repository
 
+    @property
+    def config(self) -> Config:
+        """Configuration this manager was last pointed at."""
+        return self._config
+
+    def apply_config(self, config: Config) -> None:
+        """Adopt a new configuration in place.
+
+        Rebuilding the manager instead would silently discard the per-identity
+        notification cooldown state and the configured interval.
+        """
+        self._config = config
+
     # ------------------------------------------------------------- recording
 
     def record(self, alert: Alert) -> AlertTransition:

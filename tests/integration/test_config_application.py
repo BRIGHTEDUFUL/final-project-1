@@ -140,6 +140,23 @@ def test_apply_config_points_context_at_pipeline_objects(tmp_path: Path, load_fi
         context.close()
 
 
+def test_save_config_keeps_alert_manager_state(tmp_path: Path, load_fixture) -> None:
+    """Rebuilding the manager on save would reset notification cooldowns."""
+    context = _context(tmp_path, load_fixture)
+    try:
+        manager = context.alert_manager
+        notifier = manager.notifier
+
+        context.save_config(replace(context.config, notifications_enabled=False))
+
+        assert context.alert_manager is manager
+        assert context.alert_manager.notifier is notifier
+        assert context.alert_manager.config is context.config
+        assert context.pipeline.config is context.config
+    finally:
+        context.close()
+
+
 def test_retention_change_reaches_pipeline(tmp_path: Path, load_fixture) -> None:
     """The retention window read during pruning comes from the new config."""
     context = _context(tmp_path, load_fixture)

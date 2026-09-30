@@ -128,12 +128,9 @@ class AppContext:
         """Re-point the running services at a new configuration."""
         previous = self.config
         self.config = config
-        self.alert_manager = AlertManager(
-            self.alerts,
-            config=config,
-            notifier=self.alert_manager.notifier,
-            notify_below_severity=self.alert_manager.notify_below_severity,
-        )
+        # Update in place: rebuilding the manager would drop its notification
+        # cooldown state and the configured notify interval.
+        self.alert_manager.apply_config(config)
         # The pipeline keeps its own references: push the new configuration
         # into it, otherwise weights, thresholds and retention would keep the
         # values captured at construction time until the app restarts.
