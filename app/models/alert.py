@@ -114,6 +114,9 @@ class Alert:
     reasons: tuple[str, ...] = ()
     created_at: datetime = field(default_factory=utcnow)
     status: AlertStatus = AlertStatus.ACTIVE
+    first_seen: datetime | None = None
+    last_seen: datetime | None = None
+    occurrence_count: int = 1
 
     def __post_init__(self) -> None:
         if self.id is not None and (isinstance(self.id, bool) or not isinstance(self.id, int)):
@@ -148,6 +151,22 @@ class Alert:
 
         object.__setattr__(self, "reasons", _coerce_reasons(self.reasons))
         object.__setattr__(self, "created_at", coerce_datetime(self.created_at, field_name="created_at"))
+
+        object.__setattr__(
+            self,
+            "first_seen",
+            coerce_datetime(self.first_seen, field_name="first_seen", required=False)
+            or self.created_at,
+        )
+        object.__setattr__(
+            self,
+            "last_seen",
+            coerce_datetime(self.last_seen, field_name="last_seen", required=False) or self.first_seen,
+        )
+        occurrences = coerce_optional_int(
+            self.occurrence_count, field_name="occurrence_count", minimum=1
+        )
+        object.__setattr__(self, "occurrence_count", occurrences or 1)
 
         if not isinstance(self.status, AlertStatus):
             try:
@@ -184,6 +203,27 @@ class Alert:
             status=status,
         )
 
+    def record_occurrence(self, at: datetime | None = None, *, reasons: tuple[str, ...] | None = None) -> Alert:
+        """Return a copy marking another sighting of the same condition."""
+        moment = coerce_datetime(at, field_name="at", required=False) or utcnow()
+        merged = self.reasons
+        if reasons:
+            merged = tuple(dict.fromkeys([*self.reasons, *_coerce_reasons(reasons)]))
+        return Alert(
+            id=self.id,
+            ssid=self.ssid,
+            bssid=self.bssid,
+            alert_type=self.alert_type,
+            risk_score=self.risk_score,
+            severity=self.severity,
+            reasons=merged,
+            created_at=self.created_at,
+            status=self.status,
+            first_seen=self.first_seen,
+            last_seen=max(self.last_seen or moment, moment),
+            occurrence_count=self.occurrence_count + 1,
+        )
+
     @property
     def evidence(self) -> str:
         """Human-readable explanation of why the alert fired."""
@@ -206,6 +246,9 @@ class Alert:
             "reasons": list(self.reasons),
             "created_at": self.created_at.isoformat(),
             "status": self.status.value,
+            "first_seen": self.first_seen.isoformat() if self.first_seen else None,
+            "last_seen": self.last_seen.isoformat() if self.last_seen else None,
+            "occurrence_count": self.occurrence_count,
         }
 
     @classmethod
@@ -223,4 +266,7 @@ class Alert:
             reasons=tuple(data.get("reasons") or ()),
             created_at=data.get("created_at") or utcnow(),
             status=data.get("status") or AlertStatus.ACTIVE,
+            first_seen=data.get("first_seen"),
+            last_seen=data.get("last_seen"),
+            occurrence_count=data.get("occurrence_count") or 1,
         )
