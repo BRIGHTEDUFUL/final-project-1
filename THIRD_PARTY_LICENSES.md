@@ -28,14 +28,16 @@ Read the official PySide6 and Qt licensing notes before publishing binaries:
 |-----------|---------|---------|
 | pytest | Automated testing | MIT License |
 | ruff | Linting and code quality | MIT License |
+| setuptools | Build backend (`pyproject.toml` `[build-system]`) for editable installs | MIT License |
 | Git | Version control | GPL-2.0-only |
-| PyInstaller (optional, packaging phase) | Windows executable packaging | GPL-2.0-only with linking exception |
+| PyInstaller (optional, packaging) | Windows executable packaging; installed on demand by `scripts/build.ps1` | GPL-2.0-only with linking exception |
 
 ## Platform functionality (not a library dependency)
 
 | Component | Purpose | Notes |
 |-----------|---------|-------|
-| Windows `netsh wlan` | Wi-Fi scan data | Included with Windows 10/11; invoked read-only, never used to change network settings |
+| Windows `netsh wlan` | Wi-Fi scan data | Included with Windows 10/11; invoked read-only with fixed argument lists and timeouts, never used to change network settings |
+| Windows PowerShell | Displaying toast notifications | Used only for a fixed, static toast script (`app/alerts/notifiers.py`); invoked with `-NoProfile -NonInteractive` and a timeout; falls back to the local log when unavailable |
 
 ## Data and network policy
 

@@ -35,13 +35,15 @@ ruff check .
 |------|---------|
 | Start the GUI | `rogue-ap-hunter` or `python -m app` |
 | Headless initialisation check | `rogue-ap-hunter --headless` |
-| Run tests | `pytest` |
-| Run tests with coverage summary | `pytest -q` |
-| Lint | `ruff check .` |
+| Run tests | `pytest` (or `.\.venv\Scripts\pytest.exe` without activating the venv) |
+| Run only the fast unit tests | `pytest tests/unit` |
+| Lint | `ruff check .` (or `.\.venv\Scripts\ruff.exe check .`) |
 | Auto-fix import order | `ruff check --fix .` |
 | Format | `ruff format .` |
 | Lint + tests in one step | `.\scripts\dev-check.ps1` |
 | Write the default config file | `rogue-ap-hunter --write-default-config` |
+| Package a Windows build | `.\scripts\build.ps1` (runs ruff + tests, then PyInstaller) |
+| Offline performance benchmark | `.\.venv\Scripts\python.exe scripts\benchmark.py --iterations 20 --scans 50` (see [`performance.md`](performance.md)) |
 
 ## 4. Configuration and data locations
 
@@ -58,8 +60,10 @@ network.
 ## 5. Project conventions
 
 - Type hints on all public functions; docstrings for non-obvious behaviour.
-- Modular layers: scanner → parser → models → detection → scoring → storage →
-  alerts → UI. UI code never performs detection or database access directly.
+- Modular layers: scanner → parser → storage → detection → scoring → alerts →
+  monitoring service → Qt UI, wired in `AppContext`. UI code never performs
+  detection or database access directly; domain models import nothing outside
+  the standard library.
 - No silent exception swallowing: log with context or propagate.
 - No hard-coded environment-specific paths — resolve through
   `app.core.paths`.
@@ -71,13 +75,14 @@ network.
 
 ```powershell
 git checkout -b feature/<short-name>
-git add -A
-git commit -m "Phase N: summary"
+git add <explicit paths>          # stage what you changed, not the whole tree
+git commit -m "<area>: what changed and why"
 git push -u origin feature/<short-name>
 ```
 
-Commit messages reference the development phase, e.g.
-`Phase 5: duplicate-SSID detection rule with evidence`.
+Commit messages name the area first, e.g.
+`Detection: duplicate-SSID rule with evidence`. (Some early commits used the
+`Phase N:` form; both appear in the history.)
 
 ## 7. Troubleshooting
 
@@ -85,6 +90,6 @@ Commit messages reference the development phase, e.g.
 |---------|-----------|
 | `rogue-ap-hunter` not found | Activate the virtual environment, or use `python -m app` |
 | Exit code `3` on start | PySide6 missing — `pip install -e ".[dev]"`, or use `--headless` |
-| Tests write outside the temp dir | Tests set `ROGUE_AP_HUNTER_HOME`; do not unset it manually |
-| `netsh` reports no interface (Phase 1+) | Enable the wireless adapter, or run `netsh wlan show drivers` to diagnose |
+| Tests appear to touch real data | Startup tests redirect `ROGUE_AP_HUNTER_HOME` into a temporary directory themselves; other tests use `tmp_path` — nothing is written to your real application data |
+| `netsh` reports no wireless interface | Enable the wireless adapter or start the `WlanSvc` service; see [`troubleshooting.md`](troubleshooting.md) §1 |
 | Stale settings after a version change | Delete `config.json` or run `--write-default-config` to a new path |
