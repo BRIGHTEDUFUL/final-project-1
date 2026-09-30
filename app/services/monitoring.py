@@ -149,13 +149,27 @@ class ScanPipeline:
     def run(self) -> ScanReport:
         """Run one full pass. Never raises: failures become error reports."""
         started = perf_counter()
-        session = self._sessions.start()
+        try:
+            session = self._sessions.start()
+        except Exception:
+            # Storage is unusable (locked, read-only, deleted mid-run): there is
+            # no session row to update, so report the failure in memory only.
+            logger.exception("could not open a scan session; storage unavailable")
+            session = ScanSession().finish(ScanSessionStatus.FAILED)
+            report = ScanReport(
+                session=session,
+                duration_seconds=perf_counter() - started,
+                error="could not open a scan session; local storage is unavailable",
+            )
+            self.last_error = report.error
+            logger.info("%s", report.summary())
+            return report
         try:
             report = self._execute(session, started)
         except ScannerError as exc:
             logger.warning("scanner failure: %s", exc)
             report = self._fail(session, started, str(exc))
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:
             logger.exception("unexpected scan failure")
             report = self._fail(session, started, f"unexpected error: {exc}")
         self.last_error = None if report.ok else report.error
@@ -166,9 +180,11 @@ class ScanPipeline:
 
     def _fail(self, session: ScanSession, started: float, error: str) -> ScanReport:
         try:
-            self._sessions.finish(session, status=ScanSessionStatus.FAILED)
-        except Exception:  # pragma: no cover - defensive
+            session = self._sessions.finish(session, status=ScanSessionStatus.FAILED)
+        except Exception:
             logger.exception("could not persist failed session")
+            # Keep the in-memory report truthful even when storage is down.
+            session = session.finish(ScanSessionStatus.FAILED)
         return ScanReport(
             session=session,
             duration_seconds=perf_counter() - started,

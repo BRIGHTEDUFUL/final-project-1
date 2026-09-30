@@ -2,21 +2,31 @@
 
 from __future__ import annotations
 
+import sys
 from importlib import metadata
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
+from app import VERSION as VERSION_SOURCE
 from app.core import paths
 from app.ui.pages.base import Page
 
 __all__ = ["AboutPage"]
 
-try:
-    VERSION = metadata.version("rogue-ap-hunter")
-except metadata.PackageNotFoundError:  # pragma: no cover - running from source
-    VERSION = "0.1.0+dev"
+
+def _version() -> str:
+    """Bundled builds report the source version; dev installs report metadata."""
+    if getattr(sys, "frozen", False):  # pragma: no cover - only inside a build
+        return VERSION_SOURCE
+    try:
+        return metadata.version("rogue-ap-hunter")
+    except metadata.PackageNotFoundError:
+        return VERSION_SOURCE
+
+
+VERSION = _version()
 
 BODY = f"""
 <p style="color:#f2f5f9; font-size:16px;"><b>Rogue AP Hunter {VERSION}</b></p>
